@@ -16,7 +16,7 @@ limitations under the License.
 #define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_DIV_H_
 
 #include <algorithm>
-#include<iostream>
+
 #include "tensorflow/lite/kernels/internal/common.h"
 
 namespace tflite {
