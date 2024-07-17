@@ -16,7 +16,7 @@ limitations under the License.
 #define TENSORFLOW_LITE_KERNELS_INTERNAL_REFERENCE_DIV_H_
 
 #include <algorithm>
-
+#include<iostream>
 #include "tensorflow/lite/kernels/internal/common.h"
 
 namespace tflite {
@@ -98,7 +98,17 @@ inline void Div(const ArithmeticParams& params,
 
   DivElementwise(flat_size, params, input1_data, input2_data, output_data);
 }
+inline void Div(const ArithmeticParams& params,
+                const RuntimeShape& input1_shape, const int16_t* input1_data,
+                const RuntimeShape& input2_shape, const int16_t* input2_data,
+                const RuntimeShape& output_shape, int16_t* output_data) {
+  TFLITE_DCHECK_LE(params.quantized_activation_min,
+                   params.quantized_activation_max);
+  const int flat_size =
+      MatchingElementsSize(input1_shape, input2_shape, output_shape);
 
+  DivElementwise(flat_size, params, input1_data, input2_data, output_data);
+}
 template <typename T, int N = 5>
 inline void BroadcastDivSlowQuantized(
     const ArithmeticParams& params, const RuntimeShape& unextended_input1_shape,
@@ -176,7 +186,19 @@ inline void BroadcastDivSlow(const ArithmeticParams& params,
       params, unextended_input1_shape, input1_data, unextended_input2_shape,
       input2_data, unextended_output_shape, output_data);
 }
-
+template <int N = 5>
+inline void BroadcastDivSlow(const ArithmeticParams& params,
+                             const RuntimeShape& unextended_input1_shape,
+                             const int16_t* input1_data,
+                             const RuntimeShape& unextended_input2_shape,
+                             const int16_t* input2_data,
+                             const RuntimeShape& unextended_output_shape,
+                             int16_t* output_data) {
+                              std::cout<<"heloo"<<std::endl;
+  BroadcastDivSlowQuantized<int16_t, N>(
+      params, unextended_input1_shape, input1_data, unextended_input2_shape,
+      input2_data, unextended_output_shape, output_data);
+}
 // TODO(jiawen): We can implement BroadcastDiv on buffers of arbitrary
 // dimensionality if the runtime code does a single loop over one dimension
 // that handles broadcasting as the base case. The code generator would then
@@ -215,7 +237,7 @@ void BroadcastDivSlow(const ArithmeticParams& params,
 
   auto div_func = [&](int indexes[N]) {
     output_data[SubscriptToIndex(output_desc, indexes)] =
-        ActivationFunctionWithMinMax(
+        ActivationFunctionWithMinMax<T>(
             input1_data[SubscriptToIndex(desc1, indexes)] /
                 input2_data[SubscriptToIndex(desc2, indexes)],
             output_activation_min, output_activation_max);
@@ -235,7 +257,7 @@ inline void Div(const ArithmeticParams& params,
   const int flat_size =
       MatchingElementsSize(input1_shape, input2_shape, output_shape);
   for (int i = 0; i < flat_size; ++i) {
-    output_data[i] = ActivationFunctionWithMinMax(
+    output_data[i] = ActivationFunctionWithMinMax<T>(
         input1_data[i] / input2_data[i], output_activation_min,
         output_activation_max);
   }

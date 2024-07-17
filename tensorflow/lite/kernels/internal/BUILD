@@ -80,6 +80,8 @@ cc_library(
     deps = [
         ":compatibility",
         ":runtime_shape",
+        "@eigen_archive//:eigen3",
+        
     ],
 )
 
