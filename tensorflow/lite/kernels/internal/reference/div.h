@@ -194,7 +194,6 @@ inline void BroadcastDivSlow(const ArithmeticParams& params,
                              const int16_t* input2_data,
                              const RuntimeShape& unextended_output_shape,
                              int16_t* output_data) {
-                              std::cout<<"heloo"<<std::endl;
   BroadcastDivSlowQuantized<int16_t, N>(
       params, unextended_input1_shape, input1_data, unextended_input2_shape,
       input2_data, unextended_output_shape, output_data);
