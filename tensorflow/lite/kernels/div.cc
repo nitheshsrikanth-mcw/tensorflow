@@ -43,6 +43,7 @@ limitations under the License.
 // line: 701 in "tensorflow/lite/kernels/BUILD", line: 62 in
 // "tensorflow/lite/core/kernels/builtin_op_kernels.h" and line: 58 in
 // "tensorflow/lite/core/kernels/register.cc"
+// without commenting conv, it causes compilation errors in Eigen library headers
 
 namespace tflite {
 namespace ops {
