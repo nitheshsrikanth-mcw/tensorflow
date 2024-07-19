@@ -12,12 +12,12 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 #include <stdint.h>
 
 #include <vector>
 
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
 #include "flatbuffers/flatbuffers.h"  // from @flatbuffers
 #include "tensorflow/lite/kernels/test_util.h"
 #include "tensorflow/lite/schema/schema_generated.h"
@@ -49,11 +49,21 @@ class BaseDivOpModel : public SingleOpModel {
   int output_;
 };
 
-class DivOpModel : public BaseDivOpModel {
+class FloatDivOpModel : public BaseDivOpModel {
  public:
   using BaseDivOpModel::BaseDivOpModel;
- template <typename T>
- std::vector<T> GetOutput() { return ExtractVector<T>(output_);
+  template <typename T>
+  std::vector<T> GetOutput() {
+    return ExtractVector<T>(output_);
+  }
+};
+
+class IntegerDivOpModel : public BaseDivOpModel {
+ public:
+  using BaseDivOpModel::BaseDivOpModel;
+  template <typename T>
+  std::vector<T> GetOutput() {
+    return ExtractVector<T>(output_);
   }
 };
 
@@ -76,8 +86,8 @@ inline float GetTolerance(int min, int max) {
   return kQuantizedTolerance;
 }
 
-TEST(DivOpTest, NoActivationInplaceInput0) {
-   DivOpModel m({TensorType_FLOAT32, {1, 2, 2, 1}},
+TEST(FloatDivOpTest, NoActivationInplaceInput0) {
+  FloatDivOpModel m({TensorType_FLOAT32, {1, 2, 2, 1}},
                     {TensorType_FLOAT32, {1, 2, 2, 1}},
                     {TensorType_FLOAT32, {}}, ActivationFunctionType_NONE);
   m.PopulateTensor<float>(m.input1(), {-0.2, 0.2, -1.2, 0.8});
@@ -93,8 +103,8 @@ TEST(DivOpTest, NoActivationInplaceInput0) {
   EXPECT_EQ(output_tensor->data.data, input_tensor->data.data);
 }
 
-TEST(DivOpTest, NoActivationInplaceInput1) {
-  DivOpModel m({TensorType_FLOAT32, {1, 2, 2, 1}},
+TEST(FloatDivOpTest, NoActivationInplaceInput1) {
+  FloatDivOpModel m({TensorType_FLOAT32, {1, 2, 2, 1}},
                     {TensorType_FLOAT32, {1, 2, 2, 1}},
                     {TensorType_FLOAT32, {}}, ActivationFunctionType_NONE);
   m.PopulateTensor<float>(m.input1(), {-0.2, 0.2, -1.2, 0.8});
@@ -110,8 +120,8 @@ TEST(DivOpTest, NoActivationInplaceInput1) {
   EXPECT_EQ(output_tensor->data.data, input_tensor->data.data);
 }
 
-TEST(DivOpTest, NoActivation) {
-  DivOpModel m({TensorType_FLOAT32, {1, 2, 2, 1}},
+TEST(FloatDivOpTest, NoActivation) {
+  FloatDivOpModel m({TensorType_FLOAT32, {1, 2, 2, 1}},
                     {TensorType_FLOAT32, {1, 2, 2, 1}},
                     {TensorType_FLOAT32, {}}, ActivationFunctionType_NONE);
   m.PopulateTensor<float>(m.input1(), {-0.2, 0.2, -1.2, 0.8});
@@ -121,8 +131,8 @@ TEST(DivOpTest, NoActivation) {
               ElementsAreArray(ArrayFloatNear({-0.4, 1.0, 0.8, 1.6})));
 }
 
-TEST(DivOpTest, ActivationRELU_N1_TO_1) {
-  DivOpModel m(
+TEST(FloatDivOpTest, ActivationRELU_N1_TO_1) {
+  FloatDivOpModel m(
       {TensorType_FLOAT32, {1, 2, 2, 1}}, {TensorType_FLOAT32, {1, 2, 2, 1}},
       {TensorType_FLOAT32, {}}, ActivationFunctionType_RELU_N1_TO_1);
   m.PopulateTensor<float>(m.input1(), {-0.2, 0.2, -1.2, 0.8});
@@ -132,11 +142,11 @@ TEST(DivOpTest, ActivationRELU_N1_TO_1) {
               ElementsAreArray(ArrayFloatNear({-1.0, 1.0, 0.8, 1.0})));
 }
 
-TEST(DivOpTest, VariousInputShapes) {
+TEST(FloatDivOpTest, VariousInputShapes) {
   std::vector<std::vector<int>> test_shapes = {
       {6}, {2, 3}, {2, 1, 3}, {1, 3, 1, 2}};
   for (int i = 0; i < test_shapes.size(); ++i) {
-    DivOpModel m({TensorType_FLOAT32, test_shapes[i]},
+    FloatDivOpModel m({TensorType_FLOAT32, test_shapes[i]},
                       {TensorType_FLOAT32, test_shapes[i]},
                       {TensorType_FLOAT32, {}}, ActivationFunctionType_NONE);
     m.PopulateTensor<float>(m.input1(), {-2.0, 0.2, 0.3, 0.8, 1.1, -2.0});
@@ -149,11 +159,11 @@ TEST(DivOpTest, VariousInputShapes) {
   }
 }
 
-TEST(DivOpTest, WithBroadcast) {
+TEST(FloatDivOpTest, WithBroadcast) {
   std::vector<std::vector<int>> test_shapes = {
       {8}, {2, 4}, {2, 1, 4}, {1, 2, 2, 2}};
   for (int i = 0; i < test_shapes.size(); ++i) {
-    DivOpModel m({TensorType_FLOAT32, test_shapes[i]},
+    FloatDivOpModel m({TensorType_FLOAT32, test_shapes[i]},
                       {TensorType_FLOAT32, {}},  // always a scalar
                       {TensorType_FLOAT32, {}}, ActivationFunctionType_NONE);
     m.PopulateTensor<float>(m.input1(),
@@ -167,10 +177,10 @@ TEST(DivOpTest, WithBroadcast) {
   }
 }
 
-TEST(DivOpTest, WithBroadcast5D) {
+TEST(FloatDivOpTest, WithBroadcast5D) {
   std::vector<std::vector<int>> test_shapes = {{1, 2, 1, 2, 2}};
   for (int i = 0; i < test_shapes.size(); ++i) {
-    DivOpModel m({TensorType_FLOAT32, test_shapes[i]},
+    FloatDivOpModel m({TensorType_FLOAT32, test_shapes[i]},
                       {TensorType_FLOAT32, {}},  // always a scalar
                       {TensorType_FLOAT32, {}}, ActivationFunctionType_NONE);
     m.PopulateTensor<float>(m.input1(),
@@ -184,8 +194,8 @@ TEST(DivOpTest, WithBroadcast5D) {
   }
 }
 
-TEST(DivOpTest, NoActivationint32) {
-  DivOpModel m({TensorType_INT32, {1, 2, 2, 1}},
+TEST(IntegerDivOpTest, NoActivationint32) {
+  IntegerDivOpModel m({TensorType_INT32, {1, 2, 2, 1}},
                       {TensorType_INT32, {1, 2, 2, 1}}, {TensorType_INT32, {}},
                       ActivationFunctionType_NONE);
   m.PopulateTensor<int32_t>(m.input1(), {-2, 2, -15, 8});
@@ -194,8 +204,8 @@ TEST(DivOpTest, NoActivationint32) {
   EXPECT_THAT(m.GetOutput<int32_t>(), ElementsAreArray({0, -1, 5, 1}));
 }
 
-TEST(DivOpTest, ActivationRELU_N1_TO_1int32) {
-  DivOpModel m({TensorType_INT32, {1, 2, 2, 1}},
+TEST(IntegerDivOpTest, ActivationRELU_N1_TO_1int32) {
+  IntegerDivOpModel m({TensorType_INT32, {1, 2, 2, 1}},
                       {TensorType_INT32, {1, 2, 2, 1}}, {TensorType_INT32, {}},
                       ActivationFunctionType_RELU_N1_TO_1);
   m.PopulateTensor<int32_t>(m.input1(), {-2, 2, -12, 8});
@@ -204,26 +214,27 @@ TEST(DivOpTest, ActivationRELU_N1_TO_1int32) {
   EXPECT_THAT(m.GetOutput<int32_t>(), ElementsAreArray({-1, 1, 0, 1}));
 }
 
-TEST(DivOpTest, VariousInputShapesint32) {
+TEST(IntegerDivOpTest, VariousInputShapesint32) {
   std::vector<std::vector<int>> test_shapes = {
       {6}, {2, 3}, {2, 1, 3}, {1, 3, 1, 2}};
   for (int i = 0; i < test_shapes.size(); ++i) {
-    DivOpModel m({TensorType_INT32, test_shapes[i]},
+    IntegerDivOpModel m({TensorType_INT32, test_shapes[i]},
                         {TensorType_INT32, test_shapes[i]},
                         {TensorType_INT32, {}}, ActivationFunctionType_NONE);
     m.PopulateTensor<int32_t>(m.input1(), {-20, 2, 3, 8, 11, -20});
     m.PopulateTensor<int32_t>(m.input2(), {1, 2, 6, 5, -11, -1});
     ASSERT_EQ(m.Invoke(), kTfLiteOk);
-    EXPECT_THAT(m.GetOutput<int32_t>(), ElementsAreArray({-20, 1, 0, 1, -1, 20}))
+    EXPECT_THAT(m.GetOutput<int32_t>(),
+                ElementsAreArray({-20, 1, 0, 1, -1, 20}))
         << "With shape number " << i;
   }
 }
 
-TEST(DivOpTest, WithBroadcastint32) {
+TEST(IntegerDivOpTest, WithBroadcastint32) {
   std::vector<std::vector<int>> test_shapes = {
       {8}, {2, 4}, {2, 1, 4}, {1, 4, 1, 2}, {1, 2, 1, 2, 2}};
   for (int i = 0; i < test_shapes.size(); ++i) {
-    DivOpModel m({TensorType_INT32, test_shapes[i]},
+    IntegerDivOpModel m({TensorType_INT32, test_shapes[i]},
                         {TensorType_INT32, {}},  // always a scalar
                         {TensorType_INT32, {}}, ActivationFunctionType_NONE);
     m.PopulateTensor<int32_t>(m.input1(), {-20, 21, 7, 8, 11, -123, -42, -48});
@@ -235,18 +246,16 @@ TEST(DivOpTest, WithBroadcastint32) {
   }
 }
 
-TEST(DivOpTest, NoActivationInplaceInput0f16) {
-  DivOpModel m({TensorType_FLOAT16, {1, 2, 2, 1}},
+TEST(FloatDivOpTest, NoActivationInplaceInput0f16) {
+  FloatDivOpModel m({TensorType_FLOAT16, {1, 2, 2, 1}},
                     {TensorType_FLOAT16, {1, 2, 2, 1}},
                     {TensorType_FLOAT16, {}}, ActivationFunctionType_NONE);
   m.PopulateTensor<Eigen::half>(
-      m.input1(),
-      {Eigen::half(-0.2), Eigen::half(0.2),
-       Eigen::half(-1.2), Eigen::half(0.8)});
+      m.input1(), {Eigen::half(-0.2), Eigen::half(0.2), Eigen::half(-1.2),
+                   Eigen::half(0.8)});
   m.PopulateTensor<Eigen::half>(
       m.input2(),
-      {Eigen::half(0.5), Eigen::half(0.2),
-      Eigen::half(-1.5), Eigen::half(.5)});
+      {Eigen::half(0.5), Eigen::half(0.2), Eigen::half(-1.5), Eigen::half(.5)});
   const int kInplaceInputTensorIdx = 0;
   const int kInplaceOutputTensorIdx = 0;
   const TfLiteTensor* input_tensor = m.GetInputTensor(kInplaceInputTensorIdx);
@@ -255,25 +264,22 @@ TEST(DivOpTest, NoActivationInplaceInput0f16) {
   ASSERT_EQ(m.Invoke(), kTfLiteOk);
   EXPECT_THAT(
       m.GetOutput<Eigen::half>(),
-      ElementsAreArray(ArrayFloatNear(
-          {Eigen::half(-0.4), Eigen::half(1.0),
-           Eigen::half(0.8), Eigen::half(1.6)},
-          1e-3)));
+      ElementsAreArray(ArrayFloatNear({Eigen::half(-0.4), Eigen::half(1.0),
+                                       Eigen::half(0.8), Eigen::half(1.6)},
+                                      1e-3)));
   EXPECT_EQ(output_tensor->data.data, input_tensor->data.data);
 }
 
-TEST(DivOpTest, NoActivationInplaceInput1f16) {
-  DivOpModel m({TensorType_FLOAT16, {1, 2, 2, 1}},
+TEST(FloatDivOpTest, NoActivationInplaceInput1f16) {
+  FloatDivOpModel m({TensorType_FLOAT16, {1, 2, 2, 1}},
                     {TensorType_FLOAT16, {1, 2, 2, 1}},
                     {TensorType_FLOAT16, {}}, ActivationFunctionType_NONE);
   m.PopulateTensor<Eigen::half>(
-      m.input1(),
-      {Eigen::half(-0.2), Eigen::half(0.2),
-       Eigen::half(-1.2), Eigen::half(0.8)});
+      m.input1(), {Eigen::half(-0.2), Eigen::half(0.2), Eigen::half(-1.2),
+                   Eigen::half(0.8)});
   m.PopulateTensor<Eigen::half>(
-      m.input2(),
-      {Eigen::half(0.5), Eigen::half(0.2),
-       Eigen::half(-1.5), Eigen::half(0.5)});
+      m.input2(), {Eigen::half(0.5), Eigen::half(0.2), Eigen::half(-1.5),
+                   Eigen::half(0.5)});
   const int kInplaceInputTensorIdx = 1;
   const int kInplaceOutputTensorIdx = 0;
   const TfLiteTensor* input_tensor = m.GetInputTensor(kInplaceInputTensorIdx);
@@ -282,324 +288,266 @@ TEST(DivOpTest, NoActivationInplaceInput1f16) {
   ASSERT_EQ(m.Invoke(), kTfLiteOk);
   EXPECT_THAT(
       m.GetOutput<Eigen::half>(),
-      ElementsAreArray(ArrayFloatNear(
-          {Eigen::half(-0.4), Eigen::half(1.0),
-           Eigen::half(0.8), Eigen::half(1.6)},
-          1e-3)));
+      ElementsAreArray(ArrayFloatNear({Eigen::half(-0.4), Eigen::half(1.0),
+                                       Eigen::half(0.8), Eigen::half(1.6)},
+                                      1e-3)));
   EXPECT_EQ(output_tensor->data.data, input_tensor->data.data);
 }
 
-TEST(DivOpTest, NoActivationf16) {
-  DivOpModel m({TensorType_FLOAT16, {1, 2, 2, 1}},
+TEST(FloatDivOpTest, NoActivationf16) {
+  FloatDivOpModel m({TensorType_FLOAT16, {1, 2, 2, 1}},
                     {TensorType_FLOAT16, {1, 2, 2, 1}},
                     {TensorType_FLOAT16, {}}, ActivationFunctionType_NONE);
   m.PopulateTensor<Eigen::half>(
-      m.input1(),
-      {Eigen::half(-0.2), Eigen::half(0.2),
-       Eigen::half(-1.2), Eigen::half(0.8)});
+      m.input1(), {Eigen::half(-0.2), Eigen::half(0.2), Eigen::half(-1.2),
+                   Eigen::half(0.8)});
   m.PopulateTensor<Eigen::half>(
-      m.input2(),
-      {Eigen::half(0.5), Eigen::half(0.2),
-       Eigen::half(-1.5), Eigen::half(0.5)});
+      m.input2(), {Eigen::half(0.5), Eigen::half(0.2), Eigen::half(-1.5),
+                   Eigen::half(0.5)});
   ASSERT_EQ(m.Invoke(), kTfLiteOk);
   EXPECT_THAT(
       m.GetOutput<Eigen::half>(),
-      ElementsAreArray(ArrayFloatNear(
-          {Eigen::half(-0.4), Eigen::half(1.0),
-           Eigen::half(0.8), Eigen::half(1.6)},
-          1e-3)));
+      ElementsAreArray(ArrayFloatNear({Eigen::half(-0.4), Eigen::half(1.0),
+                                       Eigen::half(0.8), Eigen::half(1.6)},
+                                      1e-3)));
 }
 
-TEST(DivOpTest, ActivationRELU_N1_TO_1f16) {
-  DivOpModel m(
+TEST(FloatDivOpTest, ActivationRELU_N1_TO_1f16) {
+  FloatDivOpModel m(
       {TensorType_FLOAT16, {1, 2, 2, 1}}, {TensorType_FLOAT16, {1, 2, 2, 1}},
       {TensorType_FLOAT16, {}}, ActivationFunctionType_RELU_N1_TO_1);
   m.PopulateTensor<Eigen::half>(
-      m.input1(),
-      {Eigen::half(-0.2), Eigen::half(0.2),
-       Eigen::half(-1.2), Eigen::half(0.8)});
+      m.input1(), {Eigen::half(-0.2), Eigen::half(0.2), Eigen::half(-1.2),
+                   Eigen::half(0.8)});
   m.PopulateTensor<Eigen::half>(
-      m.input2(),
-      {Eigen::half(0.1), Eigen::half(0.2),
-       Eigen::half(-1.5), Eigen::half(0.5)});
+      m.input2(), {Eigen::half(0.1), Eigen::half(0.2), Eigen::half(-1.5),
+                   Eigen::half(0.5)});
   ASSERT_EQ(m.Invoke(), kTfLiteOk);
   EXPECT_THAT(
       m.GetOutput<Eigen::half>(),
-      ElementsAreArray(ArrayFloatNear(
-          {Eigen::half(-1.0), Eigen::half(1.0),
-          Eigen::half(0.8), Eigen::half(1.0)},
-          1e-3)));
+      ElementsAreArray(ArrayFloatNear({Eigen::half(-1.0), Eigen::half(1.0),
+                                       Eigen::half(0.8), Eigen::half(1.0)},
+                                      1e-3)));
 }
 
-TEST(DivOpTest, VariousInputShapesf16) {
+TEST(FloatDivOpTest, VariousInputShapesf16) {
   std::vector<std::vector<int>> test_shapes = {
       {6}, {2, 3}, {2, 1, 3}, {1, 3, 1, 2}};
   for (int i = 0; i < test_shapes.size(); ++i) {
-    DivOpModel m({TensorType_FLOAT16, test_shapes[i]},
+    FloatDivOpModel m({TensorType_FLOAT16, test_shapes[i]},
                       {TensorType_FLOAT16, test_shapes[i]},
                       {TensorType_FLOAT16, {}}, ActivationFunctionType_NONE);
     m.PopulateTensor<Eigen::half>(
-        m.input1(),
-        {Eigen::half(-2.0), Eigen::half(0.2),
-         Eigen::half(0.3), Eigen::half(0.8),
-        Eigen::half(1.1), Eigen::half(-2.0)});
+        m.input1(), {Eigen::half(-2.0), Eigen::half(0.2), Eigen::half(0.3),
+                     Eigen::half(0.8), Eigen::half(1.1), Eigen::half(-2.0)});
     m.PopulateTensor<Eigen::half>(
-        m.input2(),
-        {Eigen::half(0.1), Eigen::half(0.2),
-         Eigen::half(0.6), Eigen::half(0.5),
-         Eigen::half(-1.1), Eigen::half(-0.1)});
+        m.input2(), {Eigen::half(0.1), Eigen::half(0.2), Eigen::half(0.6),
+                     Eigen::half(0.5), Eigen::half(-1.1), Eigen::half(-0.1)});
     ASSERT_EQ(m.Invoke(), kTfLiteOk);
-    EXPECT_THAT(
-        m.GetOutput<Eigen::half>(),
-        ElementsAreArray(ArrayFloatNear(
-            {Eigen::half(-20.0), Eigen::half(1.0),
-             Eigen::half(0.5), Eigen::half(1.6),
-             Eigen::half(-1.0), Eigen::half(20.0)},
-            1e-3)))
+    EXPECT_THAT(m.GetOutput<Eigen::half>(),
+                ElementsAreArray(ArrayFloatNear(
+                    {Eigen::half(-20.0), Eigen::half(1.0), Eigen::half(0.5),
+                     Eigen::half(1.6), Eigen::half(-1.0), Eigen::half(20.0)},
+                    1e-3)))
         << "With shape number " << i;
   }
 }
 
-TEST(DivOpTest, WithBroadcastf16) {
+TEST(FloatDivOpTest, WithBroadcastf16) {
   std::vector<std::vector<int>> test_shapes = {
       {8}, {2, 4}, {2, 1, 4}, {1, 2, 2, 2}};
   for (int i = 0; i < test_shapes.size(); ++i) {
-    DivOpModel m({TensorType_FLOAT16, test_shapes[i]},
+    FloatDivOpModel m({TensorType_FLOAT16, test_shapes[i]},
                       {TensorType_FLOAT16, {}},  // always a scalar
                       {TensorType_FLOAT16, {}}, ActivationFunctionType_NONE);
     m.PopulateTensor<Eigen::half>(
-        m.input1(),
-        {Eigen::half(-0.2), Eigen::half(0.2),
-         Eigen::half(0.07), Eigen::half(0.08),
-         Eigen::half(0.11), Eigen::half(-0.123),
-         Eigen::half(-0.32), Eigen::half(0.54)});
+        m.input1(), {Eigen::half(-0.2), Eigen::half(0.2), Eigen::half(0.07),
+                     Eigen::half(0.08), Eigen::half(0.11), Eigen::half(-0.123),
+                     Eigen::half(-0.32), Eigen::half(0.54)});
     m.PopulateTensor<Eigen::half>(m.input2(), {Eigen::half(0.1)});
     ASSERT_EQ(m.Invoke(), kTfLiteOk);
-    EXPECT_THAT(
-        m.GetOutput<Eigen::half>(),
-        ElementsAreArray(ArrayFloatNear(
-            {Eigen::half(-2.0), Eigen::half(2.0),
-             Eigen::half(0.7), Eigen::half(0.8),
-             Eigen::half(1.1), Eigen::half(-1.23),
-             Eigen::half(-3.2), Eigen::half(5.4)},
-            1e-2)))
+    EXPECT_THAT(m.GetOutput<Eigen::half>(),
+                ElementsAreArray(ArrayFloatNear(
+                    {Eigen::half(-2.0), Eigen::half(2.0), Eigen::half(0.7),
+                     Eigen::half(0.8), Eigen::half(1.1), Eigen::half(-1.23),
+                     Eigen::half(-3.2), Eigen::half(5.4)},
+                    1e-2)))
         << "With shape number " << i;
   }
 }
 
-TEST(DivOpTest, WithBroadcast5Df16) {
+TEST(FloatDivOpTest, WithBroadcast5Df16) {
   std::vector<std::vector<int>> test_shapes = {{1, 2, 1, 2, 2}};
   for (int i = 0; i < test_shapes.size(); ++i) {
-    DivOpModel m({TensorType_FLOAT16, test_shapes[i]},
+    FloatDivOpModel m({TensorType_FLOAT16, test_shapes[i]},
                       {TensorType_FLOAT16, {}},  // always a scalar
                       {TensorType_FLOAT16, {}}, ActivationFunctionType_NONE);
     m.PopulateTensor<Eigen::half>(
-        m.input1(),
-        {Eigen::half(-0.2), Eigen::half(0.2),
-         Eigen::half(0.07), Eigen::half(0.08),
-         Eigen::half(0.11), Eigen::half(-0.123),
-         Eigen::half(-0.32), Eigen::half(0.54)});
+        m.input1(), {Eigen::half(-0.2), Eigen::half(0.2), Eigen::half(0.07),
+                     Eigen::half(0.08), Eigen::half(0.11), Eigen::half(-0.123),
+                     Eigen::half(-0.32), Eigen::half(0.54)});
     m.PopulateTensor<Eigen::half>(m.input2(), {Eigen::half(0.1)});
     ASSERT_EQ(m.Invoke(), kTfLiteOk);
-    EXPECT_THAT(
-        m.GetOutput<Eigen::half>(),
-        ElementsAreArray(ArrayFloatNear(
-            {Eigen::half(-2.0), Eigen::half(2.0),
-             Eigen::half(0.7), Eigen::half(0.8),
-             Eigen::half(1.1), Eigen::half(-1.23),
-             Eigen::half(-3.2), Eigen::half(5.4)},
-            1e-2)))
+    EXPECT_THAT(m.GetOutput<Eigen::half>(),
+                ElementsAreArray(ArrayFloatNear(
+                    {Eigen::half(-2.0), Eigen::half(2.0), Eigen::half(0.7),
+                     Eigen::half(0.8), Eigen::half(1.1), Eigen::half(-1.23),
+                     Eigen::half(-3.2), Eigen::half(5.4)},
+                    1e-2)))
         << "With shape number " << i;
   }
 }
 
-TEST(DivOpTest, NoActivationInplaceInput0bf16) {
-  DivOpModel m({TensorType_BFLOAT16, {1, 2, 2, 1}},
+TEST(FloatDivOpTest, NoActivationInplaceInput0bf16) {
+  FloatDivOpModel m({TensorType_BFLOAT16, {1, 2, 2, 1}},
                     {TensorType_BFLOAT16, {1, 2, 2, 1}},
                     {TensorType_BFLOAT16, {}}, ActivationFunctionType_NONE);
   m.PopulateTensor<Eigen::bfloat16>(
-      m.input1(),
-      {Eigen::bfloat16(-0.2), Eigen::bfloat16(0.2),
-       Eigen::bfloat16(-1.2), Eigen::bfloat16(0.8)});
+      m.input1(), {Eigen::bfloat16(-0.2), Eigen::bfloat16(0.2),
+                   Eigen::bfloat16(-1.2), Eigen::bfloat16(0.8)});
   m.PopulateTensor<Eigen::bfloat16>(
-      m.input2(),
-      {Eigen::bfloat16(0.5), Eigen::bfloat16(0.2),
-       Eigen::bfloat16(-1.5), Eigen::bfloat16(.5)});
+      m.input2(), {Eigen::bfloat16(0.5), Eigen::bfloat16(0.2),
+                   Eigen::bfloat16(-1.5), Eigen::bfloat16(.5)});
   const int kInplaceInputTensorIdx = 0;
   const int kInplaceOutputTensorIdx = 0;
   const TfLiteTensor* input_tensor = m.GetInputTensor(kInplaceInputTensorIdx);
   TfLiteTensor* output_tensor = m.GetOutputTensor(kInplaceOutputTensorIdx);
   output_tensor->data.data = input_tensor->data.data;
   ASSERT_EQ(m.Invoke(), kTfLiteOk);
-  EXPECT_THAT(
-      m.GetOutput<Eigen::bfloat16>(),
-      ElementsAreArray(ArrayFloatNear({Eigen::bfloat16(-0.4),
-                                       Eigen::bfloat16(1.0),
-                                       Eigen::bfloat16(0.8),
-                                       Eigen::bfloat16(1.6)})));
+  EXPECT_THAT(m.GetOutput<Eigen::bfloat16>(),
+              ElementsAreArray(ArrayFloatNear(
+                  {Eigen::bfloat16(-0.4), Eigen::bfloat16(1.0),
+                   Eigen::bfloat16(0.8), Eigen::bfloat16(1.6)})));
   EXPECT_EQ(output_tensor->data.data, input_tensor->data.data);
 }
 
-TEST(DivOpTest, NoActivationInplaceInput1bf16) {
-  DivOpModel m({TensorType_BFLOAT16, {1, 2, 2, 1}},
+TEST(FloatDivOpTest, NoActivationInplaceInput1bf16) {
+  FloatDivOpModel m({TensorType_BFLOAT16, {1, 2, 2, 1}},
                     {TensorType_BFLOAT16, {1, 2, 2, 1}},
                     {TensorType_BFLOAT16, {}}, ActivationFunctionType_NONE);
   m.PopulateTensor<Eigen::bfloat16>(
-      m.input1(),
-      {Eigen::bfloat16(-0.2), Eigen::bfloat16(0.2),
-       Eigen::bfloat16(-1.2), Eigen::bfloat16(0.8)});
+      m.input1(), {Eigen::bfloat16(-0.2), Eigen::bfloat16(0.2),
+                   Eigen::bfloat16(-1.2), Eigen::bfloat16(0.8)});
   m.PopulateTensor<Eigen::bfloat16>(
-      m.input2(),
-      {Eigen::bfloat16(0.5), Eigen::bfloat16(0.2),
-       Eigen::bfloat16(-1.5), Eigen::bfloat16(0.5)});
+      m.input2(), {Eigen::bfloat16(0.5), Eigen::bfloat16(0.2),
+                   Eigen::bfloat16(-1.5), Eigen::bfloat16(0.5)});
   const int kInplaceInputTensorIdx = 1;
   const int kInplaceOutputTensorIdx = 0;
   const TfLiteTensor* input_tensor = m.GetInputTensor(kInplaceInputTensorIdx);
   TfLiteTensor* output_tensor = m.GetOutputTensor(kInplaceOutputTensorIdx);
   output_tensor->data.data = input_tensor->data.data;
   ASSERT_EQ(m.Invoke(), kTfLiteOk);
-  EXPECT_THAT(
-      m.GetOutput<Eigen::bfloat16>(),
-      ElementsAreArray(ArrayFloatNear({Eigen::bfloat16(-0.4),
-                                       Eigen::bfloat16(1.0),
-                                       Eigen::bfloat16(0.8),
-                                       Eigen::bfloat16(1.6)})));
+  EXPECT_THAT(m.GetOutput<Eigen::bfloat16>(),
+              ElementsAreArray(ArrayFloatNear(
+                  {Eigen::bfloat16(-0.4), Eigen::bfloat16(1.0),
+                   Eigen::bfloat16(0.8), Eigen::bfloat16(1.6)})));
   EXPECT_EQ(output_tensor->data.data, input_tensor->data.data);
 }
 
-TEST(DivOpTest, NoActivationbf16) {
-  DivOpModel m({TensorType_BFLOAT16, {1, 2, 2, 1}},
+TEST(FloatDivOpTest, NoActivationbf16) {
+  FloatDivOpModel m({TensorType_BFLOAT16, {1, 2, 2, 1}},
                     {TensorType_BFLOAT16, {1, 2, 2, 1}},
                     {TensorType_BFLOAT16, {}}, ActivationFunctionType_NONE);
   m.PopulateTensor<Eigen::bfloat16>(
-      m.input1(),
-      {Eigen::bfloat16(-0.2), Eigen::bfloat16(0.2),
-       Eigen::bfloat16(-1.2), Eigen::bfloat16(0.8)});
+      m.input1(), {Eigen::bfloat16(-0.2), Eigen::bfloat16(0.2),
+                   Eigen::bfloat16(-1.2), Eigen::bfloat16(0.8)});
   m.PopulateTensor<Eigen::bfloat16>(
-      m.input2(),
-      {Eigen::bfloat16(0.5), Eigen::bfloat16(0.2),
-       Eigen::bfloat16(-1.5), Eigen::bfloat16(0.5)});
+      m.input2(), {Eigen::bfloat16(0.5), Eigen::bfloat16(0.2),
+                   Eigen::bfloat16(-1.5), Eigen::bfloat16(0.5)});
   ASSERT_EQ(m.Invoke(), kTfLiteOk);
-  EXPECT_THAT(
-      m.GetOutput<Eigen::bfloat16>(),
-      ElementsAreArray(ArrayFloatNear({Eigen::bfloat16(-0.4),
-                                       Eigen::bfloat16(1.0),
-                                      Eigen::bfloat16(0.8),
-                                      Eigen::bfloat16(1.6)})));
+  EXPECT_THAT(m.GetOutput<Eigen::bfloat16>(),
+              ElementsAreArray(ArrayFloatNear(
+                  {Eigen::bfloat16(-0.4), Eigen::bfloat16(1.0),
+                   Eigen::bfloat16(0.8), Eigen::bfloat16(1.6)})));
 }
 
-TEST(DivOpTest, ActivationRELU_N1_TO_1bf16) {
-  DivOpModel m(
+TEST(FloatDivOpTest, ActivationRELU_N1_TO_1bf16) {
+  FloatDivOpModel m(
       {TensorType_BFLOAT16, {1, 2, 2, 1}}, {TensorType_BFLOAT16, {1, 2, 2, 1}},
       {TensorType_BFLOAT16, {}}, ActivationFunctionType_RELU_N1_TO_1);
   m.PopulateTensor<Eigen::bfloat16>(
-      m.input1(),
-      {Eigen::bfloat16(-0.2), Eigen::bfloat16(0.2),
-       Eigen::bfloat16(-1.2), Eigen::bfloat16(0.8)});
+      m.input1(), {Eigen::bfloat16(-0.2), Eigen::bfloat16(0.2),
+                   Eigen::bfloat16(-1.2), Eigen::bfloat16(0.8)});
   m.PopulateTensor<Eigen::bfloat16>(
-      m.input2(),
-      {Eigen::bfloat16(0.1), Eigen::bfloat16(0.2),
-       Eigen::bfloat16(-1.5), Eigen::bfloat16(0.5)});
+      m.input2(), {Eigen::bfloat16(0.1), Eigen::bfloat16(0.2),
+                   Eigen::bfloat16(-1.5), Eigen::bfloat16(0.5)});
   ASSERT_EQ(m.Invoke(), kTfLiteOk);
-  EXPECT_THAT(
-      m.GetOutput<Eigen::bfloat16>(),
-      ElementsAreArray(ArrayFloatNear({Eigen::bfloat16(-1.0),
-                                       Eigen::bfloat16(1.0),
-                                       Eigen::bfloat16(0.8),
-                                       Eigen::bfloat16(1.0)})));
+  EXPECT_THAT(m.GetOutput<Eigen::bfloat16>(),
+              ElementsAreArray(ArrayFloatNear(
+                  {Eigen::bfloat16(-1.0), Eigen::bfloat16(1.0),
+                   Eigen::bfloat16(0.8), Eigen::bfloat16(1.0)})));
 }
 
-TEST(DivOpTest, VariousInputShapesbf16) {
+TEST(FloatDivOpTest, VariousInputShapesbf16) {
   std::vector<std::vector<int>> test_shapes = {
       {6}, {2, 3}, {2, 1, 3}, {1, 3, 1, 2}};
   for (int i = 0; i < test_shapes.size(); ++i) {
-    DivOpModel m({TensorType_BFLOAT16, test_shapes[i]},
+    FloatDivOpModel m({TensorType_BFLOAT16, test_shapes[i]},
                       {TensorType_BFLOAT16, test_shapes[i]},
                       {TensorType_BFLOAT16, {}}, ActivationFunctionType_NONE);
     m.PopulateTensor<Eigen::bfloat16>(
         m.input1(),
-        {Eigen::bfloat16(-2.0), Eigen::bfloat16(0.2),
-         Eigen::bfloat16(0.3), Eigen::bfloat16(0.8),
-         Eigen::bfloat16(1.1),
-         Eigen::bfloat16(-2.0)});
+        {Eigen::bfloat16(-2.0), Eigen::bfloat16(0.2), Eigen::bfloat16(0.3),
+         Eigen::bfloat16(0.8), Eigen::bfloat16(1.1), Eigen::bfloat16(-2.0)});
     m.PopulateTensor<Eigen::bfloat16>(
         m.input2(),
-        {Eigen::bfloat16(0.1), Eigen::bfloat16(0.2),
-         Eigen::bfloat16(0.6), Eigen::bfloat16(0.5),
-         Eigen::bfloat16(-1.1),
-         Eigen::bfloat16(-0.1)});
+        {Eigen::bfloat16(0.1), Eigen::bfloat16(0.2), Eigen::bfloat16(0.6),
+         Eigen::bfloat16(0.5), Eigen::bfloat16(-1.1), Eigen::bfloat16(-0.1)});
     ASSERT_EQ(m.Invoke(), kTfLiteOk);
-    EXPECT_THAT(
-        m.GetOutput<Eigen::bfloat16>(),
-        ElementsAreArray(ArrayFloatNear({Eigen::bfloat16(-20.0),
-                                         Eigen::bfloat16(1.0),
-                                         Eigen::bfloat16(0.5),
-                                        Eigen::bfloat16(1.6),
-                                         Eigen::bfloat16(-1.0),
-                                         Eigen::bfloat16(20.0)})))
+    EXPECT_THAT(m.GetOutput<Eigen::bfloat16>(),
+                ElementsAreArray(ArrayFloatNear(
+                    {Eigen::bfloat16(-20.0), Eigen::bfloat16(1.0),
+                     Eigen::bfloat16(0.5), Eigen::bfloat16(1.6),
+                     Eigen::bfloat16(-1.0), Eigen::bfloat16(20.0)})))
         << "With shape number " << i;
   }
 }
 
-TEST(DivOpTest, WithBroadcastbf16) {
+TEST(FloatDivOpTest, WithBroadcastbf16) {
   std::vector<std::vector<int>> test_shapes = {
       {8}, {2, 4}, {2, 1, 4}, {1, 2, 2, 2}};
   for (int i = 0; i < test_shapes.size(); ++i) {
-    DivOpModel m({TensorType_BFLOAT16, test_shapes[i]},
+    FloatDivOpModel m({TensorType_BFLOAT16, test_shapes[i]},
                       {TensorType_BFLOAT16, {}},  // always a scalar
                       {TensorType_BFLOAT16, {}}, ActivationFunctionType_NONE);
     m.PopulateTensor<Eigen::bfloat16>(
         m.input1(),
-        {Eigen::bfloat16(-0.2), Eigen::bfloat16(0.2),
-         Eigen::bfloat16(0.07), Eigen::bfloat16(0.08),
-        Eigen::bfloat16(0.11),
-         Eigen::bfloat16(-0.123),
-         Eigen::bfloat16(-0.32),
-         Eigen::bfloat16(0.54)});
-    m.PopulateTensor<Eigen::bfloat16>(m.input2(),
-                                      {Eigen::bfloat16(0.1)});
+        {Eigen::bfloat16(-0.2), Eigen::bfloat16(0.2), Eigen::bfloat16(0.07),
+         Eigen::bfloat16(0.08), Eigen::bfloat16(0.11), Eigen::bfloat16(-0.123),
+         Eigen::bfloat16(-0.32), Eigen::bfloat16(0.54)});
+    m.PopulateTensor<Eigen::bfloat16>(m.input2(), {Eigen::bfloat16(0.1)});
     ASSERT_EQ(m.Invoke(), kTfLiteOk);
-    EXPECT_THAT(m.GetOutput<Eigen::bfloat16>(), ElementsAreArray(ArrayFloatNear(
-                                       {Eigen::bfloat16(-2.0),
-                                        Eigen::bfloat16(2.0),
-                                        Eigen::bfloat16(0.7),
-                                        Eigen::bfloat16(0.8),
-                                        Eigen::bfloat16(1.1),
-                                        Eigen::bfloat16(-1.23),
-                                       Eigen::bfloat16(-3.2),
-                                        Eigen::bfloat16(5.4)},
-                                       1e-1)))
+    EXPECT_THAT(
+        m.GetOutput<Eigen::bfloat16>(),
+        ElementsAreArray(ArrayFloatNear(
+            {Eigen::bfloat16(-2.0), Eigen::bfloat16(2.0), Eigen::bfloat16(0.7),
+             Eigen::bfloat16(0.8), Eigen::bfloat16(1.1), Eigen::bfloat16(-1.23),
+             Eigen::bfloat16(-3.2), Eigen::bfloat16(5.4)},
+            1e-1)))
         << "With shape number " << i;
   }
 }
 
-TEST(DivOpTest, WithBroadcast5Dbf16) {
+TEST(FloatDivOpTest, WithBroadcast5Dbf16) {
   std::vector<std::vector<int>> test_shapes = {{1, 2, 1, 2, 2}};
   for (int i = 0; i < test_shapes.size(); ++i) {
-    DivOpModel m({TensorType_BFLOAT16, test_shapes[i]},
+    FloatDivOpModel m({TensorType_BFLOAT16, test_shapes[i]},
                       {TensorType_BFLOAT16, {}},  // always a scalar
                       {TensorType_BFLOAT16, {}}, ActivationFunctionType_NONE);
     m.PopulateTensor<Eigen::bfloat16>(
         m.input1(),
-        {Eigen::bfloat16(-0.2), Eigen::bfloat16(0.2),
-         Eigen::bfloat16(0.07), Eigen::bfloat16(0.08),
-         Eigen::bfloat16(0.11),
-         Eigen::bfloat16(-0.123),
-         Eigen::bfloat16(-0.32),
-         Eigen::bfloat16(0.54)});
-    m.PopulateTensor<Eigen::bfloat16>(m.input2(),
-                                      {Eigen::bfloat16(0.1)});
+        {Eigen::bfloat16(-0.2), Eigen::bfloat16(0.2), Eigen::bfloat16(0.07),
+         Eigen::bfloat16(0.08), Eigen::bfloat16(0.11), Eigen::bfloat16(-0.123),
+         Eigen::bfloat16(-0.32), Eigen::bfloat16(0.54)});
+    m.PopulateTensor<Eigen::bfloat16>(m.input2(), {Eigen::bfloat16(0.1)});
     ASSERT_EQ(m.Invoke(), kTfLiteOk);
-    EXPECT_THAT(m.GetOutput<Eigen::bfloat16>(), ElementsAreArray(ArrayFloatNear(
-                                       {Eigen::bfloat16(-2.0),
-                                        Eigen::bfloat16(2.0),
-                                        Eigen::bfloat16(0.7),
-                                        Eigen::bfloat16(0.8),
-                                        Eigen::bfloat16(1.1),
-                                        Eigen::bfloat16(-1.23),
-                                       Eigen::bfloat16(-3.2),
-                                        Eigen::bfloat16(5.4)},
-                                       1e-1)))
+    EXPECT_THAT(
+        m.GetOutput<Eigen::bfloat16>(),
+        ElementsAreArray(ArrayFloatNear(
+            {Eigen::bfloat16(-2.0), Eigen::bfloat16(2.0), Eigen::bfloat16(0.7),
+             Eigen::bfloat16(0.8), Eigen::bfloat16(1.1), Eigen::bfloat16(-1.23),
+             Eigen::bfloat16(-3.2), Eigen::bfloat16(5.4)},
+            1e-1)))
         << "With shape number " << i;
   }
 }

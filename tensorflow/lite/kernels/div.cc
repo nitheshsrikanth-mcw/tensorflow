@@ -39,6 +39,11 @@ limitations under the License.
 #include "tensorflow/lite/minimal_logging.h"
 #endif  // TFLITE_KERNEL_USE_XNNPACK
 
+// to make div.cc work with f16 and bf16 the following line must be commented -
+// line: 701 in "tensorflow/lite/kernels/BUILD", line: 62 in
+// "tensorflow/lite/core/kernels/builtin_op_kernels.h" and line: 58 in
+// "tensorflow/lite/core/kernels/register.cc"
+
 namespace tflite {
 namespace ops {
 namespace builtin {
