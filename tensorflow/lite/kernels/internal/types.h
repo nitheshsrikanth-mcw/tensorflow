@@ -19,6 +19,10 @@ limitations under the License.
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
+#include<iostream>
+#ifndef EIGEN_TFLITE
+#include "Eigen/Core"
+#endif
 
 #include "tensorflow/lite/kernels/internal/compatibility.h"
 #include "tensorflow/lite/kernels/internal/runtime_shape.h"
@@ -303,6 +307,7 @@ inline int MatchingElementsSize(const RuntimeShape& shape,
   const int size_1 = shape.FlatSize();
   const int size_2 = check_shape_0.FlatSize();
   const int size_3 = check_shape_1.FlatSize();
+  std::cout<<"size 1 -"<<size_1<<" "<<" size 2 -"<<size_2<<" size 3 -"<<size_3<<std::endl;
   TFLITE_CHECK_EQ(size_1, size_2);
   TFLITE_CHECK_EQ(size_2, size_3);
   return size_1;

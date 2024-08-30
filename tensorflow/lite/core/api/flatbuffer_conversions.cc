@@ -924,7 +924,10 @@ TfLiteStatus ParseOpDataTfLite(const Operator* op, BuiltinOperator op_type,
     case BuiltinOperator_STABLEHLO_COMPOSITE: {
       return ParseStablehloComposite(op, error_reporter, allocator,
                                      builtin_data);
+    } case BuiltinOperator_STABLEHLO_BATCH_NORM_GRAD: {
+      return ParseStablehloBatchNormGrad(op, error_reporter, allocator, builtin_data);
     }
+
     // TODO: skip param parsing for now since ops below don't have kernels
     case BuiltinOperator_STABLEHLO_SLICE:
     case BuiltinOperator_STABLEHLO_BROADCAST_IN_DIM:
@@ -2408,6 +2411,40 @@ TfLiteStatus ParseStablehloComposite(const Operator* op,
       error_reporter,
       "Could not get 'stablehlo.composite' operation parameters.");
   return kTfLiteError;
+}
+
+TfLiteStatus ParseStablehloBatchNormGrad(const Operator* op,
+                                         ErrorReporter* error_reporter,
+                                         BuiltinDataAllocator* allocator,
+                                         void** builtin_data) {
+  // Check for null pointers to prevent crashes
+  CheckParsePointerParams(op, error_reporter, allocator, builtin_data);
+
+  // Allocate memory for parameters
+  SafeBuiltinDataAllocator safe_allocator(allocator);
+  auto params = safe_allocator.Allocate<TfLiteBatchNormGradParams>();
+
+  // Access options from the operator
+  const StableHLOBatchNormGradOptions* schema_params =
+      op->builtin_options_2_as_StableHLOBatchNormGradOptions();
+
+  // Parse the options if they exist
+  if (schema_params) {
+    // Parse epsilon
+    params->epsilon = schema_params->epsilon();
+
+    // Parse feature_index
+    params->feature_index = schema_params->feature_index();
+
+    *builtin_data = params.release();
+    return kTfLiteOk; // Return success
+  }
+
+  // Report an error if options are missing
+  TF_LITE_REPORT_ERROR(
+      error_reporter,
+      "Could not get 'batch_norm_grad' operation parameters.");
+  return kTfLiteError;  // Return an error status
 }
 
 // We have this parse function instead of directly returning kTfLiteOk from the
