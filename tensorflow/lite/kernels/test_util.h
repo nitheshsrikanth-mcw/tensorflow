@@ -19,7 +19,7 @@ limitations under the License.
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-
+#include<iostream>
 #include <algorithm>
 #include <cmath>
 #include <complex>
@@ -36,7 +36,7 @@ limitations under the License.
 #include <type_traits>
 #include <utility>
 #include <vector>
-
+#include<iostream>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include "absl/algorithm/container.h"
@@ -783,6 +783,7 @@ class SingleOpModel {
   template <typename T>
   int AddTensor(TensorData t, const T* data, size_t size,
                 bool is_variable = false) {
+                  std::cout<<"enter add tensor"<<std::endl;
     int id = tensors_.size();
 
     // This is slightly different depending on whether we are adding a
@@ -963,6 +964,9 @@ class SingleOpModel {
     if (!v) {
       auto* t = interpreter_->tensor(index);
       CHECK(t) << "No tensor with index " << index << ".";
+      if(t->data.raw==nullptr){
+        std::cout<<"true"<<std::endl;
+      }
       CHECK(t->data.raw) << "Empty data for tensor with index " << index << ".";
       CHECK_EQ(t->type, typeToTfLiteType<T>())
           << "Type mismatch for tensor with index " << index << ". Requested "

@@ -27,7 +27,7 @@ limitations under the License.
 #include <tuple>
 #include <utility>
 #include <vector>
-
+#include<iostream>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include "flatbuffers/flatbuffers.h"  // from @flatbuffers
@@ -86,8 +86,10 @@ int SingleOpModel::AddInput(const TensorData& t) {
   if (t.per_channel_quantization) {
     id = AddTensorPerChannelQuant(t);
   } else {
+    std::cout<<"hello"<<std::endl;
     id = AddTensor<float>(t, nullptr, 0);
   }
+  std::cout<<"id value"<<id<<std::endl;
   inputs_.push_back(id);
   return id;
 }
@@ -244,9 +246,10 @@ void SingleOpModel::BuildInterpreter(std::vector<std::vector<int>> input_shapes,
     }
     resolver_ = std::unique_ptr<OpResolver>(resolver);
   }
+   std::cout<<"debug before interpreter builder"<<std::endl;
   CHECK(InterpreterBuilder(GetModel(buffer_pointer), *resolver_)(
             &interpreter_, num_threads) == kTfLiteOk);
-
+ std::cout<<"debug after interpreter builder"<<std::endl;
   CHECK(interpreter_ != nullptr);
 
   if (use_simple_allocator) {
