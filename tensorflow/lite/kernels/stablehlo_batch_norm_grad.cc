@@ -11,6 +11,7 @@
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/kernels/internal/types.h"
 #include "tensorflow/lite/kernels/kernel_util.h"
+#include "tensorflow/lite/kernels/dequantize.h"
 
 namespace tflite {
 namespace ops {
@@ -18,7 +19,7 @@ namespace builtin {
 namespace stablehlo_batch_norm_grad {
 namespace {
 
-constexpr int kMaxTemporaryTensors = 14;
+constexpr int kMaxTemporaryTensors = 21;
 constexpr int32_t kMaxReduceRank = 6;
 struct OpData {
  public:
@@ -69,6 +70,12 @@ TfLiteStatus ComputeSum(TfLiteContext* context, TfLiteNode* node,
                      [](const DataType current, const DataType in) -> DataType {
                        return in + current;
                      }));
+                       DataType* batch_sum_buffer =
+      GetTensorData<DataType>(batch_sum);
+                     for(int i=0;i<NumElements(batch_sum);++i){
+                      std::cout<<"batch sum i "<<i<<"-"<<batch_sum_buffer[i]<<std::endl;
+                     }
+
   return kTfLiteOk;
 }
 
@@ -82,7 +89,7 @@ void Sqrt(const T* input_data, T* output_data, int num_elements) {
 TfLiteStatus PrepareTemporaries(TfLiteContext* context, TfLiteNode* node,
                                 const TfLiteBatchNormGradParams* params,
                                 const TfLiteTensor* operand,
-                                const TfLiteTensor* grad_output) {
+                                const TfLiteTensor* grad_output,const TfLiteTensor* scale) {
   OpData* data = reinterpret_cast<OpData*>(node->user_data);
 
   context->AddTensors(context, kMaxTemporaryTensors,
@@ -178,8 +185,7 @@ TfLiteStatus PrepareTemporaries(TfLiteContext* context, TfLiteNode* node,
   // 7. Allocate and resize tensor for i4
   node->temporaries->data[6] = data->scratch_tensor_index + 6;
   TfLiteTensor* i4;
-  TF_LITE_ENSURE_OK(context,
-                    GetTemporarySafe(context, node, /*index=*/6, &i4));
+  TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/6, &i4));
   TfLiteIntArray* i4_bcast_shape = TfLiteIntArrayCreate(operand->dims->size);
   for (int i = 0; i < operand->dims->size; ++i) {
     i4_bcast_shape->data[i] = operand->dims->data[i];
@@ -192,8 +198,7 @@ TfLiteStatus PrepareTemporaries(TfLiteContext* context, TfLiteNode* node,
   // 8. Allocate and resize tensor for i5
   node->temporaries->data[7] = data->scratch_tensor_index + 7;
   TfLiteTensor* i5;
-  TF_LITE_ENSURE_OK(context,
-                    GetTemporarySafe(context, node, /*index=*/7, &i5));
+  TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/7, &i5));
   TfLiteIntArray* i5_bcast_shape = TfLiteIntArrayCreate(operand->dims->size);
   for (int i = 0; i < operand->dims->size; ++i) {
     i5_bcast_shape->data[i] = operand->dims->data[i];
@@ -206,8 +211,7 @@ TfLiteStatus PrepareTemporaries(TfLiteContext* context, TfLiteNode* node,
   // 9. Allocate and resize tensor for i6
   node->temporaries->data[8] = data->scratch_tensor_index + 8;
   TfLiteTensor* i6;
-  TF_LITE_ENSURE_OK(context,
-                    GetTemporarySafe(context, node, /*index=*/8, &i6));
+  TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/8, &i6));
   TfLiteIntArray* i6_bcast_shape = TfLiteIntArrayCreate(operand->dims->size);
   for (int i = 0; i < operand->dims->size; ++i) {
     i6_bcast_shape->data[i] = operand->dims->data[i];
@@ -235,26 +239,10 @@ TfLiteStatus PrepareTemporaries(TfLiteContext* context, TfLiteNode* node,
                                  context, grad_output_centered_operand_mul,
                                  grad_output_centered_operand_mul_bcast_shape));
 
-  // 11. Allocate and resize tensor for grad_operand_centered_operand
-  node->temporaries->data[10] = data->scratch_tensor_index + 10;
-  TfLiteTensor* grad_operand_centered_operand;
-  TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/10,
-                                              &grad_operand_centered_operand));
-  TfLiteIntArray* grad_operand_centered_operand_bcast_shape =
-      TfLiteIntArrayCreate(operand->dims->size);
-  for (int i = 0; i < operand->dims->size; ++i) {
-    grad_operand_centered_operand_bcast_shape->data[i] = operand->dims->data[i];
-  }
-  grad_operand_centered_operand->type = operand->type;
-  grad_operand_centered_operand->allocation_type = kTfLiteArenaRw;
-  TF_LITE_ENSURE_OK(context, context->ResizeTensor(
-                                 context, grad_operand_centered_operand,
-                                 grad_operand_centered_operand_bcast_shape));
-
   // 13. Allocate and resize tensor for grad_offset
-  node->temporaries->data[11] = data->scratch_tensor_index + 11;
+  node->temporaries->data[10] = data->scratch_tensor_index + 10;
   TfLiteTensor* grad_output_reduced;
-  TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/11,
+  TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/10,
                                               &grad_output_reduced));
   TfLiteIntArray* grad_output_reduced_shape = TfLiteIntArrayCreate(1);
   grad_output_reduced_shape->data[0] =
@@ -266,10 +254,10 @@ TfLiteStatus PrepareTemporaries(TfLiteContext* context, TfLiteNode* node,
                                                    grad_output_reduced_shape));
 
   // 14. Allocate and resize tensor for i3_intermediate
-  node->temporaries->data[12] = data->scratch_tensor_index + 12;
+  node->temporaries->data[11] = data->scratch_tensor_index + 11;
   TfLiteTensor* i3_intermediate;
   TF_LITE_ENSURE_OK(
-      context, GetTemporarySafe(context, node, /*index=*/12, &i3_intermediate));
+      context, GetTemporarySafe(context, node, /*index=*/11, &i3_intermediate));
   TfLiteIntArray* i3_intermediate_shape = TfLiteIntArrayCreate(1);
   i3_intermediate_shape->data[0] =
       grad_output_centered_operand_mul->dims->data[params->feature_index];
@@ -280,9 +268,9 @@ TfLiteStatus PrepareTemporaries(TfLiteContext* context, TfLiteNode* node,
                                                    i3_intermediate_shape));
 
   // 14. Allocate and resize tensor for grad_Scale_intermediate
-  node->temporaries->data[13] = data->scratch_tensor_index + 13;
+  node->temporaries->data[12] = data->scratch_tensor_index + 12;
   TfLiteTensor* grad_scale_intermediate;
-  TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/13,
+  TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/12,
                                               &grad_scale_intermediate));
   TfLiteIntArray* grad_scale_intermediate_shape =
       TfLiteIntArrayCreate(operand->dims->size);
@@ -295,6 +283,126 @@ TfLiteStatus PrepareTemporaries(TfLiteContext* context, TfLiteNode* node,
   TF_LITE_ENSURE_OK(context,
                     context->ResizeTensor(context, grad_scale_intermediate,
                                           grad_scale_intermediate_shape));
+
+//Quantization part
+   if (operand->type == kTfLiteInt8 || operand->type == kTfLiteInt16) {
+
+
+     TfLiteIntArray* operand_dequantize_shape =
+        TfLiteIntArrayCreate(operand->dims->size);
+    for (int i = 0; i < operand->dims->size; ++i) {
+      operand_dequantize_shape->data[i] = operand->dims->data[i];
+    }
+    node->temporaries->data[13] = data->scratch_tensor_index+13;
+    TfLiteTensor* operand_dequantize;
+    TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/13,
+                                                &operand_dequantize));
+    operand_dequantize->type = kTfLiteFloat32;
+    operand_dequantize->allocation_type = kTfLiteArenaRw;
+    TF_LITE_ENSURE_OK(context, context->ResizeTensor(context, operand_dequantize,
+                                                     operand_dequantize_shape));
+
+         TfLiteIntArray* scale_dequantize_shape =
+        TfLiteIntArrayCreate(scale->dims->size);
+    for (int i = 0; i < scale->dims->size; ++i) {
+      scale_dequantize_shape->data[i] = scale->dims->data[i];
+    }
+    node->temporaries->data[14] = data->scratch_tensor_index+14;
+    TfLiteTensor* scale_dequantize;
+    TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/14,
+                                                &scale_dequantize));
+    scale_dequantize->type = kTfLiteFloat32;
+    scale_dequantize->allocation_type = kTfLiteArenaRw;
+    TF_LITE_ENSURE_OK(context, context->ResizeTensor(context, scale_dequantize,
+                                                     scale_dequantize_shape));
+
+
+         TfLiteIntArray* mean_dequantize_shape =
+        TfLiteIntArrayCreate(scale->dims->size);
+    for (int i = 0; i < scale->dims->size; ++i) {
+      mean_dequantize_shape->data[i] = scale->dims->data[i];
+    }
+    node->temporaries->data[15] = data->scratch_tensor_index+15;
+    TfLiteTensor* mean_dequantize;
+    TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/15,
+                                                &mean_dequantize));
+    mean_dequantize->type = kTfLiteFloat32;
+    mean_dequantize->allocation_type = kTfLiteArenaRw;
+    TF_LITE_ENSURE_OK(context, context->ResizeTensor(context, mean_dequantize,
+                                                     mean_dequantize_shape));
+
+         TfLiteIntArray* variance_dequantize_shape =
+        TfLiteIntArrayCreate(scale->dims->size);
+    for (int i = 0; i < scale->dims->size; ++i) {
+      variance_dequantize_shape->data[i] = scale->dims->data[i];
+    }
+    node->temporaries->data[16] = data->scratch_tensor_index+16;
+    TfLiteTensor* variance_dequantize;
+    TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/16,
+                                                &variance_dequantize));
+    variance_dequantize->type = kTfLiteFloat32;
+    variance_dequantize->allocation_type = kTfLiteArenaRw;
+    TF_LITE_ENSURE_OK(context, context->ResizeTensor(context, variance_dequantize,
+                                                     variance_dequantize_shape));
+
+             TfLiteIntArray* grad_output_dequantize_shape =
+        TfLiteIntArrayCreate(operand->dims->size);
+    for (int i = 0; i < operand->dims->size; ++i) {
+       grad_output_dequantize_shape->data[i] = operand->dims->data[i];
+    }
+    node->temporaries->data[17] = data->scratch_tensor_index+17;
+    TfLiteTensor* grad_output_dequantize;
+    TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/17,
+                                                &grad_output_dequantize));
+    grad_output_dequantize->type = kTfLiteFloat32;
+    grad_output_dequantize->allocation_type = kTfLiteArenaRw;
+    TF_LITE_ENSURE_OK(context, context->ResizeTensor(context, grad_output_dequantize,
+                                                     grad_output_dequantize_shape));
+
+             TfLiteIntArray* grad_operand_dequantize_shape =
+        TfLiteIntArrayCreate(operand->dims->size);
+    for (int i = 0; i < operand->dims->size; ++i) {
+       grad_operand_dequantize_shape->data[i] = operand->dims->data[i];
+    }
+    node->temporaries->data[18] = data->scratch_tensor_index+18;
+    TfLiteTensor* grad_operand_dequantize;
+    TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/18,
+                                                &grad_operand_dequantize));
+    grad_operand_dequantize->type = kTfLiteFloat32;
+    grad_operand_dequantize->allocation_type = kTfLiteArenaRw;
+    TF_LITE_ENSURE_OK(context, context->ResizeTensor(context, grad_operand_dequantize,
+                                                     grad_operand_dequantize_shape));
+
+                 TfLiteIntArray* grad_scale_dequantize_shape =
+        TfLiteIntArrayCreate(scale->dims->size);
+    for (int i = 0; i < scale->dims->size; ++i) {
+       grad_scale_dequantize_shape->data[i] = scale->dims->data[i];
+    }
+    node->temporaries->data[19] = data->scratch_tensor_index+19;
+    TfLiteTensor* grad_scale_dequantize;
+    TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/19,
+                                                &grad_scale_dequantize));
+    grad_scale_dequantize->type = kTfLiteFloat32;
+    grad_scale_dequantize->allocation_type = kTfLiteArenaRw;
+    TF_LITE_ENSURE_OK(context, context->ResizeTensor(context, grad_scale_dequantize,
+                                                     grad_scale_dequantize_shape));
+
+                   TfLiteIntArray* grad_offset_dequantize_shape =
+        TfLiteIntArrayCreate(scale->dims->size);
+    for (int i = 0; i < scale->dims->size; ++i) {
+       grad_offset_dequantize_shape->data[i] = scale->dims->data[i];
+    }
+    node->temporaries->data[20] = data->scratch_tensor_index+20;
+    TfLiteTensor* grad_offset_dequantize;
+    TF_LITE_ENSURE_OK(context, GetTemporarySafe(context, node, /*index=*/20,
+                                                &grad_offset_dequantize));
+    grad_offset_dequantize->type = kTfLiteFloat32;
+    grad_offset_dequantize->allocation_type = kTfLiteArenaRw;
+    TF_LITE_ENSURE_OK(context, context->ResizeTensor(context, grad_offset_dequantize,
+                                                     grad_offset_dequantize_shape));
+
+    
+   }                                        
   return kTfLiteOk;
 }
 
@@ -338,7 +446,6 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
       context, GetOutputSafe(context, node, OpData::kOutputGradOffsetTensor,
                              &grad_offset));
 
-
   const TfLiteBatchNormGradParams* params =
       reinterpret_cast<TfLiteBatchNormGradParams*>(node->builtin_data);
   OpData* data = reinterpret_cast<OpData*>(node->user_data);
@@ -346,7 +453,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   // (C1) 0 <= feature_index < rank(operand).
   int operand_rank = NumDimensions(operand);
   TF_LITE_ENSURE(context, params->feature_index >= 0 &&
-                           params->feature_index < operand_rank);
+                              params->feature_index < operand_rank);
 
   // (C2) Ensure all tensors have the same baseline element type.
   TF_LITE_ENSURE_TYPES_EQ(context, operand->type, scale->type);
@@ -358,13 +465,12 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_TYPES_EQ(context, scale->type, grad_offset->type);
 
   // (C3) Ensure operand, grad_output, and grad_operand have the same shape.
-  TF_LITE_ENSURE_EQ(context, TfLiteIntArrayEqual(operand->dims, grad_output->dims), true);
-
-
+  TF_LITE_ENSURE_EQ(
+      context, TfLiteIntArrayEqual(operand->dims, grad_output->dims), true);
 
   // (C5) size(scale) = dim(operand, feature_index)
-  TF_LITE_ENSURE_EQ(context, scale->dims->data[0], operand->dims->data[params->feature_index]);
-
+  TF_LITE_ENSURE_EQ(context, scale->dims->data[0],
+                    operand->dims->data[params->feature_index]);
 
   TfLiteIntArray* grad_operand_size = TfLiteIntArrayCopy(operand->dims);
   TfLiteIntArray* grad_scale_size = TfLiteIntArrayCreate(1);
@@ -375,7 +481,7 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
 
   // Prepare temporary tensors
   TF_LITE_ENSURE_OK(
-      context, PrepareTemporaries(context, node, params, operand, grad_output));
+      context, PrepareTemporaries(context, node, params, operand, grad_output,scale));
   // Resize output tensors
   TF_LITE_ENSURE_OK(
       context, context->ResizeTensor(context, grad_operand, grad_operand_size));
@@ -384,13 +490,19 @@ TfLiteStatus Prepare(TfLiteContext* context, TfLiteNode* node) {
   TF_LITE_ENSURE_OK(
       context, context->ResizeTensor(context, grad_offset, grad_offset_size));
 
-        TF_LITE_ENSURE_EQ(context, TfLiteIntArrayEqual(operand->dims, grad_operand->dims), true);
+  TF_LITE_ENSURE_EQ(
+      context, TfLiteIntArrayEqual(operand->dims, grad_operand->dims), true);
 
-  // (C4) Ensure scale, mean, variance, grad_scale, and grad_offset have the same shape.
-  TF_LITE_ENSURE_EQ(context, TfLiteIntArrayEqual(scale->dims, mean->dims), true);
-  TF_LITE_ENSURE_EQ(context, TfLiteIntArrayEqual(scale->dims, variance->dims), true);
-  TF_LITE_ENSURE_EQ(context, TfLiteIntArrayEqual(scale->dims, grad_scale->dims), true);
-  TF_LITE_ENSURE_EQ(context, TfLiteIntArrayEqual(scale->dims, grad_offset->dims), true);
+  // (C4) Ensure scale, mean, variance, grad_scale, and grad_offset have the
+  // same shape.
+  TF_LITE_ENSURE_EQ(context, TfLiteIntArrayEqual(scale->dims, mean->dims),
+                    true);
+  TF_LITE_ENSURE_EQ(context, TfLiteIntArrayEqual(scale->dims, variance->dims),
+                    true);
+  TF_LITE_ENSURE_EQ(context, TfLiteIntArrayEqual(scale->dims, grad_scale->dims),
+                    true);
+  TF_LITE_ENSURE_EQ(context,
+                    TfLiteIntArrayEqual(scale->dims, grad_offset->dims), true);
 
   return kTfLiteOk;
 }
@@ -416,11 +528,15 @@ void BroadcastInDim(TfLiteContext* context, const TfLiteTensor* input,
 
 }  // namespace
 
+
+
 template <typename DataType>
-TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,const TfLiteTensor* operand, const TfLiteTensor* scale,
+TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,
+                      const TfLiteTensor* operand, const TfLiteTensor* scale,
                       const TfLiteTensor* mean, const TfLiteTensor* variance,
-                      const TfLiteTensor* grad_output, TfLiteTensor* grad_operand,
-                      TfLiteTensor* grad_scale, TfLiteTensor* grad_offset) {
+                      const TfLiteTensor* grad_output,
+                      TfLiteTensor* grad_operand, TfLiteTensor* grad_scale,
+                      TfLiteTensor* grad_offset) {
   OpData* data = reinterpret_cast<OpData*>(node->user_data);
 
   TfLiteTensor* epsilon_tensor = GetTemporary(context, node, 0);
@@ -428,21 +544,15 @@ TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,const TfLiteTenso
   TfLiteTensor* stddev = GetTemporary(context, node, 2);
   TfLiteTensor* normalized_operand = GetTemporary(context, node, 3);
   TfLiteTensor* elements_per_feature_tensor = GetTemporary(context, node, 4);
-  // TfLiteTensor* grad_operand = GetTemporary(context, node, 9);
   TfLiteTensor* i1 = GetTemporary(context, node, 5);
-  // TfLiteTensor* i2 = GetTemporary(context, node, 6);
-  // TfLiteTensor* i3 = GetTemporary(context, node, 7);
   TfLiteTensor* i4 = GetTemporary(context, node, 6);
   TfLiteTensor* i5 = GetTemporary(context, node, 7);
   TfLiteTensor* i6 = GetTemporary(context, node, 8);
   TfLiteTensor* grad_output_centered_operand_mul =
       GetTemporary(context, node, 9);
-  TfLiteTensor* grad_operand_centered_operand = GetTemporary(context, node, 10);
-  // TfLiteTensor* elements_per_feature_tensor_bcast =
-  //     GetTemporary(context, node, 11);
-  TfLiteTensor* grad_output_reduced = GetTemporary(context, node, 11);
-  TfLiteTensor* i3_intermediate = GetTemporary(context, node, 12);
-  TfLiteTensor* grad_scale_intermediate = GetTemporary(context, node, 13);
+  TfLiteTensor* grad_output_reduced = GetTemporary(context, node, 10);
+  TfLiteTensor* i3_intermediate = GetTemporary(context, node, 11);
+  TfLiteTensor* grad_scale_intermediate = GetTemporary(context, node, 12);
 
   // Set the value of epsilon in the tensor data
   const TfLiteBatchNormGradParams* params =
@@ -469,8 +579,9 @@ TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,const TfLiteTenso
   DataType* centered_operand_buffer = GetTensorData<DataType>(centered_operand);
   const float* operand_buffer = GetTensorData<float>(operand);
   const DataType* mean_data = GetTensorData<DataType>(mean);
-  for(int i=0;i<NumElements(centered_operand);++i){
-    centered_operand_buffer[i] = static_cast<DataType>(operand_buffer[i]-mean_data[i%NumElements(mean)]);
+  for (int i = 0; i < NumElements(centered_operand); ++i) {
+    centered_operand_buffer[i] = static_cast<DataType>(
+        operand_buffer[i] - mean_data[i % NumElements(mean)]);
   }
 
   int num_elements = NumElements(stddev);
@@ -479,7 +590,9 @@ TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,const TfLiteTenso
   int variance_size = NumElements(variance);
   DataType* stddev_buffer = GetTensorData<DataType>(stddev);
   for (int i = 0; i < NumElements(stddev); ++i) {
-    stddev_buffer[i] = static_cast<DataType>(std::sqrt(variance_data[i%(NumElements(variance))] + static_cast<DataType>(epsilon)));
+    stddev_buffer[i] = static_cast<DataType>(
+        std::sqrt(variance_data[i % (NumElements(variance))] +
+                  static_cast<DataType>(epsilon)));
     std::cout << "stddev  " << stddev_buffer[i] << std::endl;
   }
   for (int i = 0; i < NumElements(centered_operand); ++i) {
@@ -506,24 +619,21 @@ TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,const TfLiteTenso
   // BroadcastInDim<DataType>(context, elements_per_feature_tensor, a,
   //                elements_per_feature_tensor_bcast);
   std::cout << "after broadcasting element per feature tensor  " << std::endl;
-//  DataType* element_per_feature_buffer =
-//       GetTensorData<DataType>(elements_per_feature_tensor_bcast);
+  //  DataType* element_per_feature_buffer =
+  //       GetTensorData<DataType>(elements_per_feature_tensor_bcast);
   DataType* element_per_feature_tensor_buffer =
       GetTensorData<DataType>(elements_per_feature_tensor);
   const DataType* grad_output_buffer = GetTensorData<DataType>(grad_output);
   DataType* i1_buffer = GetTensorData<DataType>(i1);
   for (int i = 0; i < NumElements(i1); ++i) {
-    i1_buffer[i] = grad_output_buffer[i] * element_per_feature_tensor_buffer[i%(NumElements(elements_per_feature_tensor))];
+    i1_buffer[i] = grad_output_buffer[i] *
+                   element_per_feature_tensor_buffer
+                       [i % (NumElements(elements_per_feature_tensor))];
   }
 
   // //i2
   ComputeSum<DataType>(context, node, grad_output, feature_index,
                        grad_output_reduced);
-  //   DataType* grad_output_reduced_buffer=GetTensorData<DataType>(grad_output_reduced);
-  //  for(int i=0;i<NumElements(grad_output_reduced);++i){
-  //   grad_output_reduced_buffer[i]=static_cast<DataType>(grad_output_reduced_buffer[i%(NumElements(grad_output_reduced))]);
-  //  }                
-  // BroadcastInDim<DataType>(context, grad_output_reduced, feature_dims, i2);
 
   DataType* grad_output_centered_operand_mul_buffer =
       GetTensorData<DataType>(grad_output_centered_operand_mul);
@@ -534,12 +644,13 @@ TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,const TfLiteTenso
 
   ComputeSum<DataType>(context, node, grad_output_centered_operand_mul,
                        feature_index, i3_intermediate);
-  // BroadcastInDim<DataType>(context, i3_intermediate, feature_dims, i3);
+
 
   DataType* i4_buffer = GetTensorData<DataType>(i4);
   DataType* i3_intermediate_buffer = GetTensorData<DataType>(i3_intermediate);
   for (int i = 0; i < NumElements(i4); ++i) {
-    i4_buffer[i] = i3_intermediate_buffer[i%(NumElements(i3_intermediate))] * centered_operand_buffer[i];
+    i4_buffer[i] = i3_intermediate_buffer[i % (NumElements(i3_intermediate))] *
+                   centered_operand_buffer[i];
     std::cout << "i4 buffer " << i4_buffer[i] << std::endl;
     std::cout << "i3 buffer " << i3_intermediate_buffer[i] << std::endl;
   }
@@ -547,25 +658,34 @@ TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,const TfLiteTenso
   DataType* i5_buffer = GetTensorData<DataType>(i5);
 
   for (int i = 0; i < NumElements(i5); ++i) {
-    i5_buffer[i] = i4_buffer[i] / (variance_data[i%(NumElements(variance))]+static_cast<DataType>(epsilon));
+    i5_buffer[i] = i4_buffer[i] / (variance_data[i % (NumElements(variance))] +
+                                   static_cast<DataType>(epsilon));
   }
 
   DataType* i6_buffer = GetTensorData<DataType>(i6);
-  DataType* grad_output_reduced_buffer = GetTensorData<DataType>(grad_output_reduced);
-  // std::cout << "num ele " << NumElements(i1) << "  " << NumElements(i2) << "  "
+  DataType* grad_output_reduced_buffer =
+      GetTensorData<DataType>(grad_output_reduced);
+  // std::cout << "num ele " << NumElements(i1) << "  " << NumElements(i2) << "
+  // "
   //           << NumElements(i5) << "  " << NumElements(i6) << std::endl;
   for (int i = 0; i < NumElements(i6); ++i) {
-    i6_buffer[i] = ((i1_buffer[i] - grad_output_reduced_buffer[i%NumElements(grad_output_reduced)]) - i5_buffer[i]);
-    std::cout << "intermediate val " << i1_buffer[i] << " " << grad_output_reduced_buffer[i]
-              << " " << i5_buffer[i] << std::endl;
-    std::cout << "int 2 " << i1_buffer[i] -grad_output_reduced_buffer[i] << "   "
-              << i1_buffer[i] - grad_output_reduced_buffer[i] - i5_buffer[i] << std::endl;
+    i6_buffer[i] =
+        ((i1_buffer[i] -
+          grad_output_reduced_buffer[i % NumElements(grad_output_reduced)]) -
+         i5_buffer[i]);
+    std::cout << "intermediate val " << i1_buffer[i] << " "
+              << grad_output_reduced_buffer[i] << " " << i5_buffer[i]
+              << std::endl;
+    std::cout << "int 2 " << i1_buffer[i] - grad_output_reduced_buffer[i]
+              << "   "
+              << i1_buffer[i] - grad_output_reduced_buffer[i] - i5_buffer[i]
+              << std::endl;
     std::cout << "i6 after cal " << i6_buffer[i] << std::endl;
   }
 
   for (int i = 0; i < NumElements(elements_per_feature_tensor); ++i) {
-    std::cout << "element_per_feature data " << element_per_feature_tensor_buffer[i]
-              << std::endl;
+    std::cout << "element_per_feature data "
+              << element_per_feature_tensor_buffer[i] << std::endl;
   }
   for (int i = 0; i < NumElements(i6); ++i) {
     std::cout << "i5 data " << i5_buffer[i] << std::endl;
@@ -576,9 +696,11 @@ TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,const TfLiteTenso
   DataType* grad_operand_buffer = GetTensorData<DataType>(grad_operand);
   // DataType* scale_bcast_buffer = GetTensorData<DataType>(scale_bcast);
   for (int i = 0; i < NumElements(grad_operand); ++i) {
-    grad_operand_buffer[i] = ((scale_data[i%scale_size] / stddev_buffer[i]) /
-                              element_per_feature_tensor_buffer[i%(NumElements(elements_per_feature_tensor))]) *
-                             i6_buffer[i];
+    grad_operand_buffer[i] =
+        ((scale_data[i % scale_size] / stddev_buffer[i]) /
+         element_per_feature_tensor_buffer
+             [i % (NumElements(elements_per_feature_tensor))]) *
+        i6_buffer[i];
   }
 
   DataType* grad_scale_intermediate_buffer =
@@ -603,8 +725,80 @@ TfLiteStatus EvalImpl(TfLiteContext* context, TfLiteNode* node,const TfLiteTenso
   return kTfLiteOk;
 }
 
-TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
+template <typename DataType>
+TfLiteStatus EvalQuantImp(TfLiteContext* context, TfLiteNode* node,
+                          const TfLiteTensor* operand,
+                          const TfLiteTensor* scale, 
+                          const TfLiteTensor* mean,
+                          const TfLiteTensor* variance,
+                          const TfLiteTensor* grad_output,
+                          TfLiteTensor* grad_operand, TfLiteTensor* grad_scale,
+                          TfLiteTensor* grad_offset) {
+                            std::cout<<"entered eval quantiz"<<std::endl;
 
+  TfLiteTensor* operand_dequantize = GetTemporary(context, node, 13);
+  TfLiteTensor* scale_dequantize = GetTemporary(context, node, 14);
+  TfLiteTensor* mean_dequantize = GetTemporary(context, node, 15);
+  TfLiteTensor* variance_dequantize = GetTemporary(context, node, 16);
+  TfLiteTensor* grad_output_dequantize = GetTemporary(context, node, 17);
+  TfLiteTensor* grad_operand_dequantize = GetTemporary(context, node, 18);
+  TfLiteTensor* grad_scale_dequantize = GetTemporary(context, node, 19);
+  TfLiteTensor* grad_offset_dequantize = GetTemporary(context, node, 20);
+ std::cout<<"entered eval quantiz fter 740"<<std::endl;
+  dequantize::DequantizeImpl<dequantize::KernelType::kGenericOptimized>(
+      context, node, operand, operand_dequantize);
+       std::cout<<"entered eval quantiz after 743"<<std::endl;
+  dequantize::DequantizeImpl<dequantize::KernelType::kGenericOptimized>(
+      context, node, scale, scale_dequantize);
+       std::cout<<"entered eval quantiz after 746"<<std::endl;
+  dequantize::DequantizeImpl<dequantize::KernelType::kGenericOptimized>(
+      context, node, mean, mean_dequantize);
+       std::cout<<"entered eval quantiz after 749"<<std::endl;
+  dequantize::DequantizeImpl<dequantize::KernelType::kGenericOptimized>(
+      context, node, variance, variance_dequantize);
+       std::cout<<"entered eval quantiz after 752"<<std::endl;
+  dequantize::DequantizeImpl<dequantize::KernelType::kGenericOptimized>(
+      context, node, grad_output, grad_output_dequantize);
+ std::cout<<"entered eval quantiz before evalquantimp"<<std::endl;
+  EvalImpl<float>(context,node,operand_dequantize, scale_dequantize, mean_dequantize, variance_dequantize, grad_output_dequantize, grad_operand_dequantize,
+                  grad_scale_dequantize, grad_offset_dequantize);
+                   std::cout<<"entered eval quantiz after evalquantimp"<<std::endl;
+
+  RuntimeShape grad_operand_shape(GetTensorShape(grad_operand));
+  RuntimeShape grad_operand_dequantize_shape(GetTensorShape(grad_operand_dequantize));
+    RuntimeShape grad_scale_shape(GetTensorShape(grad_scale));
+  RuntimeShape grad_scale_dequantize_shape(GetTensorShape(grad_scale_dequantize));
+    RuntimeShape grad_offset_shape(GetTensorShape(grad_offset));
+  RuntimeShape grad_offset_dequantize_shape(GetTensorShape(grad_offset_dequantize));
+  std::cout<<"after shaPE 766"<<std::endl;
+ 
+    tflite::QuantizationParams op_params;
+    op_params.zero_point = grad_operand->params.zero_point;
+    op_params.scale = grad_operand->params.scale;
+    op_params.zero_point = grad_scale->params.zero_point;
+    op_params.scale = grad_scale->params.scale;
+    op_params.zero_point = grad_offset->params.zero_point;
+    op_params.scale = grad_offset->params.scale;
+    optimized_ops::AffineQuantize<DataType>(
+        op_params, grad_operand_dequantize_shape,
+        GetTensorData<float>(grad_operand_dequantize), grad_operand_shape,
+        GetTensorData<DataType>(grad_operand));
+        std::cout<<"AFTER 780"<<std::endl;
+            optimized_ops::AffineQuantize<DataType>(
+        op_params, grad_scale_dequantize_shape,
+        GetTensorData<float>(grad_scale_dequantize), grad_scale_shape,
+        GetTensorData<DataType>(grad_scale));
+        std::cout<<"AFTER 784"<<std::endl;
+            optimized_ops::AffineQuantize<DataType>(
+        op_params, grad_offset_dequantize_shape,
+        GetTensorData<float>(grad_offset_dequantize), grad_offset_shape,
+        GetTensorData<DataType>(grad_offset));
+  std::cout<<"end of evalqimp"<<std::endl;
+   return kTfLiteOk;
+
+}
+
+TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
   // Get the input tensors
   const TfLiteTensor* operand;
   TF_LITE_ENSURE_OK(
@@ -642,22 +836,41 @@ TfLiteStatus Eval(TfLiteContext* context, TfLiteNode* node) {
       context, GetOutputSafe(context, node, OpData::kOutputGradOffsetTensor,
                              &grad_offset));
 
- switch (operand->type) {
+  switch (operand->type) {
     case kTfLiteFloat32: {
-      return EvalImpl<float>( context, node,operand,scale, mean,variance,grad_output,grad_operand,grad_scale,grad_offset);
+      return EvalImpl<float>(context, node, operand, scale, mean, variance,
+                             grad_output, grad_operand, grad_scale,
+                             grad_offset);
     }
     case kTfLiteFloat16: {
-      return EvalImpl<Eigen::half>(context, node,operand,scale, mean,variance,grad_output,grad_operand,grad_scale,grad_offset);
+      return EvalImpl<Eigen::half>(context, node, operand, scale, mean,
+                                   variance, grad_output, grad_operand,
+                                   grad_scale, grad_offset);
     }
     case kTfLiteBFloat16: {
-      return EvalImpl<Eigen::bfloat16>( context,  node,operand,scale, mean,variance,grad_output,grad_operand,grad_scale,grad_offset);
+      return EvalImpl<Eigen::bfloat16>(context, node, operand, scale, mean,
+                                       variance, grad_output, grad_operand,
+                                       grad_scale, grad_offset);
     }
-     default: {
-      TF_LITE_KERNEL_LOG(context, "Type '%s' is not supported by stablehlo.batch_norm_grad.",
-                         TfLiteTypeGetName(operand->type));
+    case kTfLiteInt8: {
+      std::cout<<"entered int 8"<<std::endl;
+      return EvalQuantImp<int8_t>(context, node, operand, scale, mean, variance,
+                                  grad_output, grad_operand, grad_scale,
+                                  grad_offset);
+
+    }
+    case kTfLiteInt16: {
+      return EvalQuantImp<int16_t>(context, node, operand, scale, mean,
+                                   variance, grad_output, grad_operand,
+                                   grad_scale, grad_offset);
+    }
+    default: {
+      TF_LITE_KERNEL_LOG(
+          context, "Type '%s' is not supported by stablehlo.batch_norm_grad.",
+          TfLiteTypeGetName(operand->type));
       return kTfLiteError;
     }
- }
+  }
 }
 }  // namespace stablehlo_batch_norm_grad
 
