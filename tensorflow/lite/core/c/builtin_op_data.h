@@ -654,6 +654,11 @@ typedef struct {
   size_t attributes_size;
 } TfLiteStablehloCompositeParams;
 
+typedef struct {
+  float epsilon;
+  int64_t feature_index;
+} TfLiteBatchNormGradParams;
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
