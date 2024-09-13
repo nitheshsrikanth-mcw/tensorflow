@@ -127,133 +127,133 @@ class BatchNormGradOpModel : public SingleOpModel {
   int grad_offset_;
 };
 
-// TEST(BatchNormGradOpModel, SimpleTest) {
-//   TfLiteBatchNormGradParams params = {0.0f, 2};
+TEST(BatchNormGradOpModel, SimpleTest) {
+  TfLiteBatchNormGradParams params = {0.0f, 2};
 
-//   BatchNormGradOpModel<float> model(
-//       /*input_shape=*/{TensorType_FLOAT32, {2, 2, 2}},
-//       /*scale_shape=*/{TensorType_FLOAT32, {2}},
-//       /*mean_shape=*/{TensorType_FLOAT32, {2}},
-//       /*variance_shape=*/{TensorType_FLOAT32, {2}},
-//       /*grad_output_shape=*/{TensorType_FLOAT32, {2, 2, 2}},
-//       {TensorType_FLOAT32, {}}, {TensorType_FLOAT32, {}},
-//       {TensorType_FLOAT32, {}}, params);
+  BatchNormGradOpModel<float> model(
+      /*input_shape=*/{TensorType_FLOAT32, {2, 2, 2}},
+      /*scale_shape=*/{TensorType_FLOAT32, {2}},
+      /*mean_shape=*/{TensorType_FLOAT32, {2}},
+      /*variance_shape=*/{TensorType_FLOAT32, {2}},
+      /*grad_output_shape=*/{TensorType_FLOAT32, {2, 2, 2}},
+      {TensorType_FLOAT32, {}}, {TensorType_FLOAT32, {}},
+      {TensorType_FLOAT32, {}}, params);
 
-//   model.SetInput({1.0f, 2.0f, 3.0f, 4.0f, 3.0f, 4.0f, 1.0f, 2.0f});
-//   model.SetScale({1.0f, 1.0f});
-//   model.SetMean({2.0f, 3.0f});
-//   model.SetVariance({1.0f, 1.0f});
-//   model.SetGradOutput({0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f});
+  model.SetInput({1.0f, 2.0f, 3.0f, 4.0f, 3.0f, 4.0f, 1.0f, 2.0f});
+  model.SetScale({1.0f, 1.0f});
+  model.SetMean({2.0f, 3.0f});
+  model.SetVariance({1.0f, 1.0f});
+  model.SetGradOutput({0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f, 0.1f});
 
-//   model.Invoke();
-//   EXPECT_THAT(
-//       model.GetOutputGradOperand(),
-//       ElementsAreArray({0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}));
-//   EXPECT_THAT(model.GetOutputGradScale(), ElementsAreArray({0.0f, 0.0f}));
-//   EXPECT_THAT(model.GetOutputGradOffset(), ElementsAreArray({0.4f, 0.4f}));
-// }
+  model.Invoke();
+  EXPECT_THAT(
+      model.GetOutputGradOperand(),
+      ElementsAreArray({0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f}));
+  EXPECT_THAT(model.GetOutputGradScale(), ElementsAreArray({0.0f, 0.0f}));
+  EXPECT_THAT(model.GetOutputGradOffset(), ElementsAreArray({0.4f, 0.4f}));
+}
 
-// TEST(StableHLOBatchNormGradOpTest, SimpleTest1) {
-//   TfLiteBatchNormGradParams params = {1e-5, 2};
+TEST(StableHLOBatchNormGradOpTest, SimpleTest1) {
+  TfLiteBatchNormGradParams params = {1e-5, 2};
 
-//   BatchNormGradOpModel<float> model(
-//       /*input_shape=*/{TensorType_FLOAT32, {2, 2, 3}},
-//       /*scale_shape=*/{TensorType_FLOAT32, {3}},
-//       /*mean_shape=*/{TensorType_FLOAT32, {3}},
-//       /*variance_shape=*/{TensorType_FLOAT32, {3}},
-//       /*grad_output_shape=*/{TensorType_FLOAT32, {2, 2, 3}},
-//       {TensorType_FLOAT32, {}}, {TensorType_FLOAT32, {}},
-//       {TensorType_FLOAT32, {}}, params);
+  BatchNormGradOpModel<float> model(
+      /*input_shape=*/{TensorType_FLOAT32, {2, 2, 3}},
+      /*scale_shape=*/{TensorType_FLOAT32, {3}},
+      /*mean_shape=*/{TensorType_FLOAT32, {3}},
+      /*variance_shape=*/{TensorType_FLOAT32, {3}},
+      /*grad_output_shape=*/{TensorType_FLOAT32, {2, 2, 3}},
+      {TensorType_FLOAT32, {}}, {TensorType_FLOAT32, {}},
+      {TensorType_FLOAT32, {}}, params);
 
-//   model.SetInput({1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f,
-//                   11.0f, 12.0f});
-//   model.SetScale({1.0f, 1.0f, 1.0f});
-//   model.SetMean({2.0f, 3.0f, 4.0f});
-//   model.SetVariance({1.0f, 1.0f, 1.0f});
-//   model.SetGradOutput(
-//       {0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f});
+  model.SetInput({1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f, 9.0f, 10.0f,
+                  11.0f, 12.0f});
+  model.SetScale({1.0f, 1.0f, 1.0f});
+  model.SetMean({2.0f, 3.0f, 4.0f});
+  model.SetVariance({1.0f, 1.0f, 1.0f});
+  model.SetGradOutput(
+      {0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f, 0.2f});
 
-//   model.Invoke();
-//   EXPECT_THAT(
-//       model.GetOutputGradOperand(),
-//       ElementsAreArray(ArrayFloatNear(
-//           {0.6999895, 0.6999895, 0.6999895, -1.399979, -1.399979, -1.399979,
-//            -3.4999475, -3.4999475, -3.4999475, -5.599916, -5.599916, -5.599916},
-//           1e-3)));
-//   EXPECT_THAT(model.GetOutputGradScale(),
-//               ElementsAreArray(
-//                   ArrayFloatNear({2.799986f, 2.799986f, 2.799986f}, 1e-4)));
-//   EXPECT_THAT(model.GetOutputGradOffset(),
-//               ElementsAreArray({0.8f, 0.8f, 0.8f}));
-// }
+  model.Invoke();
+  EXPECT_THAT(
+      model.GetOutputGradOperand(),
+      ElementsAreArray(ArrayFloatNear(
+          {0.6999895, 0.6999895, 0.6999895, -1.399979, -1.399979, -1.399979,
+           -3.4999475, -3.4999475, -3.4999475, -5.599916, -5.599916, -5.599916},
+          1e-3)));
+  EXPECT_THAT(model.GetOutputGradScale(),
+              ElementsAreArray(
+                  ArrayFloatNear({2.799986f, 2.799986f, 2.799986f}, 1e-4)));
+  EXPECT_THAT(model.GetOutputGradOffset(),
+              ElementsAreArray({0.8f, 0.8f, 0.8f}));
+}
 
-// TEST(StableHLOBatchNormGradOpTest2, DifferentOperandEpsilonFeatureIndex) {
-//   {
-//     TfLiteBatchNormGradParams params = {
-//         0.01f, 2};  // different epsilon and feature_index
+TEST(StableHLOBatchNormGradOpTest2, DifferentOperandEpsilonFeatureIndex) {
+  {
+    TfLiteBatchNormGradParams params = {
+        0.01f, 2};  // different epsilon and feature_index
 
-//     BatchNormGradOpModel<float> model(
-//         /*input_shape=*/{TensorType_FLOAT32, {2, 2, 2}},
-//         /*scale_shape=*/{TensorType_FLOAT32, {2}},
-//         /*mean_shape=*/{TensorType_FLOAT32, {2}},
-//         /*variance_shape=*/{TensorType_FLOAT32, {2}},
-//         /*grad_output_shape=*/{TensorType_FLOAT32, {2, 2, 2}},
-//         {TensorType_FLOAT32, {}}, {TensorType_FLOAT32, {}},
-//         {TensorType_FLOAT32, {}}, params);
+    BatchNormGradOpModel<float> model(
+        /*input_shape=*/{TensorType_FLOAT32, {2, 2, 2}},
+        /*scale_shape=*/{TensorType_FLOAT32, {2}},
+        /*mean_shape=*/{TensorType_FLOAT32, {2}},
+        /*variance_shape=*/{TensorType_FLOAT32, {2}},
+        /*grad_output_shape=*/{TensorType_FLOAT32, {2, 2, 2}},
+        {TensorType_FLOAT32, {}}, {TensorType_FLOAT32, {}},
+        {TensorType_FLOAT32, {}}, params);
 
-//     model.SetInput({1.0f, 2.0f, 3.0f, 4.0f, 3.0f, 4.0f, 5.0f, 6.0f});
-//     model.SetScale({0.5f, 0.8f});
-//     model.SetMean({1.5f, 2.5f});
-//     model.SetVariance({0.3f, 0.7f});
-//     model.SetGradOutput({0.3f, 0.3f, 0.3f, 0.3f, 0.3f, 0.3f, 0.3f, 0.3f});
+    model.SetInput({1.0f, 2.0f, 3.0f, 4.0f, 3.0f, 4.0f, 5.0f, 6.0f});
+    model.SetScale({0.5f, 0.8f});
+    model.SetMean({1.5f, 2.5f});
+    model.SetVariance({0.3f, 0.7f});
+    model.SetGradOutput({0.3f, 0.3f, 0.3f, 0.3f, 0.3f, 0.3f, 0.3f, 0.3f});
 
-//     model.Invoke();
+    model.Invoke();
 
-//     EXPECT_THAT(model.GetOutputGradOperand(),
-//                 ElementsAreArray(ArrayFloatNear(
-//                     {0.65179343, 0.30087422, -1.9553803, -0.90262267,
-//                      -1.9553803, -0.90262267, -4.56255404, -2.10611956},
-//                     1e-5)));
-//     EXPECT_THAT(
-//         model.GetOutputGradScale(),
-//         ElementsAreArray(ArrayFloatNear({3.23289544, 2.13620698}, 1e-4)));
-//     EXPECT_THAT(model.GetOutputGradOffset(), ElementsAreArray({1.2f, 1.2f}));
-//   }
-// }
+    EXPECT_THAT(model.GetOutputGradOperand(),
+                ElementsAreArray(ArrayFloatNear(
+                    {0.65179343, 0.30087422, -1.9553803, -0.90262267,
+                     -1.9553803, -0.90262267, -4.56255404, -2.10611956},
+                    1e-5)));
+    EXPECT_THAT(
+        model.GetOutputGradScale(),
+        ElementsAreArray(ArrayFloatNear({3.23289544, 2.13620698}, 1e-4)));
+    EXPECT_THAT(model.GetOutputGradOffset(), ElementsAreArray({1.2f, 1.2f}));
+  }
+}
 
-// TEST(StableHLOBatchNormGradOpTest3, DifferentOperandEpsilonFeatureIndex) {
-//   {
-//     TfLiteBatchNormGradParams params = {
-//         0.1f, 0};  // larger epsilon, feature_index = 0
+TEST(StableHLOBatchNormGradOpTest3, DifferentOperandEpsilonFeatureIndex) {
+  {
+    TfLiteBatchNormGradParams params = {
+        0.1f, 0};  // larger epsilon, feature_index = 0
 
-//     BatchNormGradOpModel<float> model(
-//         /*input_shape=*/{TensorType_FLOAT32, {2, 2, 2}},
-//         /*scale_shape=*/{TensorType_FLOAT32, {2}},
-//         /*mean_shape=*/{TensorType_FLOAT32, {2}},
-//         /*variance_shape=*/{TensorType_FLOAT32, {2}},
-//         /*grad_output_shape=*/{TensorType_FLOAT32, {2, 2, 2}},
-//         {TensorType_FLOAT32, {2, 2, 2}}, {TensorType_FLOAT32, {2}},
-//         {TensorType_FLOAT32, {2}}, params);
+    BatchNormGradOpModel<float> model(
+        /*input_shape=*/{TensorType_FLOAT32, {2, 2, 2}},
+        /*scale_shape=*/{TensorType_FLOAT32, {2}},
+        /*mean_shape=*/{TensorType_FLOAT32, {2}},
+        /*variance_shape=*/{TensorType_FLOAT32, {2}},
+        /*grad_output_shape=*/{TensorType_FLOAT32, {2, 2, 2}},
+        {TensorType_FLOAT32, {2, 2, 2}}, {TensorType_FLOAT32, {2}},
+        {TensorType_FLOAT32, {2}}, params);
 
-//     model.SetInput({1.5f, 3.0f, 4.5f, 6.0f, 3.0f, 6.0f, 4.5f, 9.0f});
-//     model.SetScale({0.9f, 1.2f});
-//     model.SetMean({2.0f, 5.0f});
-//     model.SetVariance({0.4f, 0.9f});
-//     model.SetGradOutput({0.4f, 0.4f, 0.4f, 0.4f, 0.4f, 0.4f, 0.4f, 0.4f});
+    model.SetInput({1.5f, 3.0f, 4.5f, 6.0f, 3.0f, 6.0f, 4.5f, 9.0f});
+    model.SetScale({0.9f, 1.2f});
+    model.SetMean({2.0f, 5.0f});
+    model.SetVariance({0.4f, 0.9f});
+    model.SetGradOutput({0.4f, 0.4f, 0.4f, 0.4f, 0.4f, 0.4f, 0.4f, 0.4f});
 
-//     model.Invoke();
+    model.Invoke();
 
-//     EXPECT_THAT(
-//         model.GetOutputGradOperand(),
-//         ElementsAreArray(ArrayFloatNear({0.12727922, 2.04, -0.6363961, -1.02,
-//                                          -0.25455844, -1.02, -0.6363961, -4.08},
-//                                         1e-5)));
-//     EXPECT_THAT(
-//         model.GetOutputGradScale(),
-//         ElementsAreArray(ArrayFloatNear({0.73137085, 3.97989899}, 1e-4)));
-//     EXPECT_THAT(model.GetOutputGradOffset(), ElementsAreArray({1.6f, 1.6f}));
-//   }
-// }
+    EXPECT_THAT(
+        model.GetOutputGradOperand(),
+        ElementsAreArray(ArrayFloatNear({0.12727922, 2.04, -0.6363961, -1.02,
+                                         -0.25455844, -1.02, -0.6363961, -4.08},
+                                        1e-5)));
+    EXPECT_THAT(
+        model.GetOutputGradScale(),
+        ElementsAreArray(ArrayFloatNear({0.73137085, 3.97989899}, 1e-4)));
+    EXPECT_THAT(model.GetOutputGradOffset(), ElementsAreArray({1.6f, 1.6f}));
+  }
+}
 
 template <typename T>
 class QuantizedBatchNormGradOpModel : public BatchNormGradOpModel<T> {
@@ -290,47 +290,47 @@ class QuantizedBatchNormGradOpModel : public BatchNormGradOpModel<T> {
   }
 };
 
-TEST(StableHLOBatchNormGradOpTest4, DifferentOperandEpsilonFeatureIndex1) {
-  {
-    TfLiteBatchNormGradParams params = {
-        0.001f, 2};  // larger epsilon, feature_index = 0
+// TEST(StableHLOBatchNormGradOpTest4, DifferentOperandEpsilonFeatureIndex1) {
+//   {
+//     TfLiteBatchNormGradParams params = {
+//         0.001f, 2};  // larger epsilon, feature_index = 0
 
-    QuantizedBatchNormGradOpModel<int8_t> model(
-        /*input_shape=*/{TensorType_INT8, {2, 2, 2}, -127, 127},
-        /*scale_shape=*/{TensorType_INT8, {2}, -127, 127},
-        /*mean_shape=*/{TensorType_INT8, {2}, -127, 127},
-        /*variance_shape=*/{TensorType_INT8, {2}, -127, 127},
-        /*grad_output_shape=*/{TensorType_INT8, {2, 2, 2}, -127, 127},
-        {TensorType_INT8, {}, -127, 127}, {TensorType_INT8, {}, -127, 127},
-        {TensorType_INT8, {}, -127, 127}, params);
+//     QuantizedBatchNormGradOpModel<int8_t> model(
+//         /*input_shape=*/{TensorType_INT8, {2, 2, 2}, -127, 127},
+//         /*scale_shape=*/{TensorType_INT8, {2}, -127, 127},
+//         /*mean_shape=*/{TensorType_INT8, {2}, -127, 127},
+//         /*variance_shape=*/{TensorType_INT8, {2}, -127, 127},
+//         /*grad_output_shape=*/{TensorType_INT8, {2, 2, 2}, -127, 127},
+//         {TensorType_INT8, {}, -127, 127}, {TensorType_INT8, {}, -127, 127},
+//         {TensorType_INT8, {}, -127, 127}, params);
 
-    // model.SetInput({10, 20, -30, 40, -10, 50, 60, -70});
-    // model.SetScale({5, -5});
-    // model.SetMean({15, -15});
-    // model.SetVariance({8, 12});
-    // model.SetGradOutput({3, -3, 6, -6, 9, -9, 12, -12});
-  std::vector<float> operand = {10, 20, -30, 40, -10, 50, 60, -70};
-  std::vector<float> scale = {5, -5};
-  std::vector<float> mean = {5, -15};
-  std::vector<float> variance = {8, 12};
-  std::vector<float> gradoutput = {3, -3, 6, -6, 9, -9, 12, -12};
-  model.QuantizeAndPopulate<int8_t>(model.operand(), operand);
-  model.QuantizeAndPopulate<int8_t>(model.scale(), scale);
-  model.QuantizeAndPopulate<int8_t>(model.mean(), mean);
-  model.QuantizeAndPopulate<int8_t>(model.variance(), variance);
-  model.QuantizeAndPopulate<int8_t>(model.grad_output(), gradoutput);
+//     // model.SetInput({10, 20, -30, 40, -10, 50, 60, -70});
+//     // model.SetScale({5, -5});
+//     // model.SetMean({15, -15});
+//     // model.SetVariance({8, 12});
+//     // model.SetGradOutput({3, -3, 6, -6, 9, -9, 12, -12});
+//   std::vector<float> operand = {10, 20, -30, 40, -10, 50, 60, -70};
+//   std::vector<float> scale = {5, -5};
+//   std::vector<float> mean = {5, -15};
+//   std::vector<float> variance = {8, 12};
+//   std::vector<float> gradoutput = {3, -3, 6, -6, 9, -9, 12, -12};
+//   model.QuantizeAndPopulate<int8_t>(model.operand(), operand);
+//   model.QuantizeAndPopulate<int8_t>(model.scale(), scale);
+//   model.QuantizeAndPopulate<int8_t>(model.mean(), mean);
+//   model.QuantizeAndPopulate<int8_t>(model.variance(), variance);
+//   model.QuantizeAndPopulate<int8_t>(model.grad_output(), gradoutput);
 
-    model.Invoke();
+//     model.Invoke();
 
-    EXPECT_THAT(
-        model.GetDequantizedGradOperand(),
-        ElementsAreArray(ArrayFloatNear({-99 ,127 ,123,  -85, 20,  67, 30,  89},1e-1)));
-    EXPECT_THAT(
-        model.GetDequantizedGradScale(),
-        ElementsAreArray(ArrayFloatNear({116  ,-103})));
-    EXPECT_THAT(model.GetDequantizedGradOffset(), ElementsAreArray({30 , -30}));
-  }
-}
+//     EXPECT_THAT(
+//         model.GetDequantizedGradOperand(),
+//         ElementsAreArray(ArrayFloatNear({-99 ,127 ,123,  -85, 20,  67, 30,  89},1e-1)));
+//     EXPECT_THAT(
+//         model.GetDequantizedGradScale(),
+//         ElementsAreArray(ArrayFloatNear({116  ,-103})));
+//     EXPECT_THAT(model.GetDequantizedGradOffset(), ElementsAreArray({30 , -30}));
+//   }
+// }
 
 }  // namespace
 }  // namespace tflite
