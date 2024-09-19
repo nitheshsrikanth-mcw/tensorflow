@@ -231,10 +231,11 @@ TEST(ElementWise, Abs) {
                                          3.f, -2.f, 10.f, 1.f,  //
                                      });
   ASSERT_EQ(m.Invoke(), kTfLiteOk);
-  EXPECT_THAT(m.ExtractVector<float>(m.output()), ElementsAreArray({
-                                                      0.f, 6.2f, 2.f, 4.f,  //
-                                                      3.f, 2.f, 10.f, 1.f,  //
-                                                  }));
+  EXPECT_THAT(m.ExtractVector<float>(m.output()),
+              Pointwise(FloatingPointEq(), {
+                                               0.f, 6.2f, 2.f, 4.f,  //
+                                               3.f, 2.f, 10.f, 1.f,  //
+                                           }));
 }
 
 TEST(ElementWise, AbsInt32) {
@@ -341,6 +342,43 @@ TEST(ElementWise, Rsqrt) {
               ElementsAreArray(ArrayFloatNear({1, 0.7071, 0.5, 0.33333})));
   EXPECT_THAT(m.GetTensorShape(m.output()), ElementsAreArray({1, 1, 4, 1}));
 }
+
+TEST(ElementWise, SqrtInt16) {
+  std::vector<float> data = {16., 46., 78., 142., 1., 17., 49., 113.};
+  std::vector<float> sqrt_data(data.size());
+  for (int i = 0; i < sqrt_data.size(); i++) {
+    sqrt_data[i] =  std::sqrt(data[i]);
+  }
+  float kInputScale = 142.0 / 255.0;
+  float kOutputScale = 1.0 / 255.0;
+  int32_t zero_point = -128;
+  ElementWiseOpQuantizedModel m(BuiltinOperator_SQRT,
+                                {TensorType_INT8,
+                                 {1, 8},
+                                 -127,
+                                 127.0,
+                                //  kInputScale,
+                                //  zero_point,
+                                 true,
+                                //  {kInputScale},
+                                //  {zero_point}
+                                },
+                                {TensorType_INT8,
+                                 {1, 8},
+                                 -127,
+                                 127,
+                                //  kOutputScale,
+                                //  zero_point,
+                                 true,
+                                //  {kOutputScale},
+                                //  {zero_point}
+                                 });
+  m.QuantizeAndPopulate<int8_t>(m.input(), data);
+  ASSERT_EQ(m.Invoke(), kTfLiteOk);
+  EXPECT_THAT(m.ExtractDequantVector<int8_t>(m.output()),
+              ElementsAreArray(ArrayFloatNear(sqrt_data, 0.1)));
+}
+
 
 TEST(ElementWise, RsqrtInt8) {
   std::vector<float> data = {15., 46., 78., 142., 1., 17., 49., 113.};

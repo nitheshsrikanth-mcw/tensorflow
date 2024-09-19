@@ -654,6 +654,13 @@ typedef struct {
   size_t attributes_size;
 } TfLiteStablehloCompositeParams;
 
+typedef struct {
+  // See the stablehlo spec for the explanation of the attributes:
+  // https://github.com/openxla/stablehlo/blob/main/docs/spec.md#batch_norm_training
+  float epsilon;
+  int64_t feature_index;
+} TfLiteStablehloBatchNormTrainingParams;
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

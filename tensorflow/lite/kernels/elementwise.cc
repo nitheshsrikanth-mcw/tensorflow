@@ -18,9 +18,10 @@ limitations under the License.
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <functional>
 #include <limits>
-
+#include<iostream>
 #include "tensorflow/lite/core/c/common.h"
 #include "tensorflow/lite/kernels/internal/common.h"
 #include "tensorflow/lite/kernels/internal/quantization_util.h"
@@ -47,6 +48,7 @@ namespace {
 const char kAbsName[] = "Abs";
 const char kLogName[] = "Log";
 const char kRsqrtName[] = "Rsqrt";
+const char kSqrtName[] = "Sqrt";
 
 struct OpData {
   int32_t multiplier;
@@ -91,6 +93,14 @@ inline void SetRsqrtOutputMultiplier(const float input_scale,
                                      const float output_scale,
                                      int32_t* multiplier, int32_t* shift) {
   const double scale = 1. / (std::sqrt(input_scale) * output_scale);
+  QuantizeMultiplier(scale, multiplier, shift);
+}
+
+inline void SetSqrtOutputMultiplier(const float input_scale,
+                                     const float output_scale,
+                                     int32_t* multiplier, int32_t* shift) {
+  const double scale = (std::sqrt(input_scale) * output_scale);
+  std::cout<<"sqrt real multiplier  "<<scale<<std::endl;
   QuantizeMultiplier(scale, multiplier, shift);
 }
 
@@ -193,6 +203,10 @@ TfLiteStatus GenericPrepare(TfLiteContext* context, TfLiteNode* node,
     } else if (op_name == kLogName) {
       LogLUTPrepare(input->type, op_data, input_scale, op_data->input_offset,
                     output_scale, op_data->output_offset);
+    }
+    else if (op_name == kSqrtName) {
+      SetSqrtOutputMultiplier(input_scale, output_scale,
+                                 &op_data->multiplier, &op_data->shift);
     }
   }
   return context->ResizeTensor(context, output,
@@ -346,10 +360,56 @@ TfLiteStatus LogEval(TfLiteContext* context, TfLiteNode* node) {
   }
 }
 
-TfLiteStatus SqrtEval(TfLiteContext* context, TfLiteNode* node) {
-#ifdef TFLITE_KERNEL_USE_XNNPACK
-  const TfLiteTensor* input;
+
+TfLiteStatus SqrtEvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
+                                    TfLiteType type) {
+  const auto* op_data = static_cast<const OpData*>(node->user_data);
+    const TfLiteTensor* input;
   TF_LITE_ENSURE_OK(context, GetInputSafe(context, node, 0, &input));
+  TfLiteTensor* output;
+  TF_LITE_ENSURE_OK(context, GetOutputSafe(context, node, 0, &output));
+  const int kMin = std::numeric_limits<int8_t>::min();
+  const int kMax = std::numeric_limits<int8_t>::max();
+  std::function<TfLiteStatus(int8_t)> validate_input_func = [&](int8_t i) {
+    TF_LITE_ENSURE_MSG(context, i >= op_data->input_offset,
+                       "Sqrt is only defined for positive values");
+    return kTfLiteOk;
+  };
+  std::cout<<"input zp and offset "<<input->params.zero_point<<"  "<<op_data->input_offset<<std::endl;
+  std::cout<<"output zp and offset "<<output->params.zero_point<<"  "<<op_data->output_offset<<std::endl;
+  std::function<int8_t(int8_t)> func = [&](int8_t i) {
+    const int32_t value = (i - op_data->input_offset);
+    std::cout<<"value "<<value<<" i "<<int(i)<<std::endl;
+   //const int32_t kShift = 11;  // Shift to keep value integer.
+    if (value == 0) {
+      // Assume that any value close to 0 represents the max output value.
+      return static_cast<int8_t>(kMax);
+    }
+    const int32_t data = std::sqrt(value);
+    std::cout<<"data "<<data<<std::endl;
+    //const int32_t output = data +op_data->output_offset;
+    // const int32_t data = MultiplyByQuantizedMultiplier(1, inv_sqrt_multiplier,
+    //                                                    inv_sqrt_shift + kShift);
+    const int32_t output =
+        MultiplyByQuantizedMultiplier(data, op_data->multiplier,
+                                      op_data->shift) +
+        op_data->output_offset;
+      std::cout<<"output "<<output<<std::endl;
+      std::cout<<"before shift "<< MultiplyByQuantizedMultiplier(data, op_data->multiplier,
+                                      op_data->shift)<<std::endl;
+    return static_cast<int8_t>(std::min(std::max(output, kMin), kMax));
+  };
+
+  return EvalImpl<int8_t>(context, node, func, validate_input_func, type);
+}
+
+
+TfLiteStatus SqrtEval(TfLiteContext* context, TfLiteNode* node) {
+    const TfLiteTensor* input;
+  TF_LITE_ENSURE_OK(context, GetInputSafe(context, node, 0, &input));
+  switch(input->type){
+    case kTfLiteFloat32:{
+#ifdef TFLITE_KERNEL_USE_XNNPACK
   if (input->type == kTfLiteFloat32) {
     xnn_status status;
     const size_t channel_dim = 1;
@@ -372,6 +432,15 @@ TfLiteStatus SqrtEval(TfLiteContext* context, TfLiteNode* node) {
   }
 #endif  // TFLITE_KERNEL_USE_XNNPACK
   return EvalNumeric(context, node, std::sqrt);
+    }
+    case kTfLiteInt8:
+     return SqrtEvalQuantizedInt8(context,node,input->type);
+     default:
+         TF_LITE_KERNEL_LOG(context, "Current data type %s is not supported.",
+                         TfLiteTypeGetName(input->type));
+      return kTfLiteError;
+  }
+
 }
 
 TfLiteStatus RsqrtEvalQuantizedInt8(TfLiteContext* context, TfLiteNode* node,
@@ -527,10 +596,11 @@ TfLiteRegistration* Register_LOG() {
   return &r;
 }
 
-GENERIC_PREPARE(PrepareSqrt, elementwise::IsNumericSupportedType, "Sqrt")
+GENERIC_PREPARE(PrepareSqrt, elementwise::IsRsqrtSupportedType, elementwise::kSqrtName)
 
 TfLiteRegistration* Register_SQRT() {
-  static TfLiteRegistration r = {/*init=*/nullptr, /*free=*/nullptr,
+  static TfLiteRegistration r = {elementwise::ElementWiseQuantizedInit,
+                                 elementwise::ElementWiseQuantizedFree,
                                  PrepareSqrt, elementwise::SqrtEval};
   return &r;
 }
